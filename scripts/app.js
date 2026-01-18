@@ -1208,6 +1208,7 @@ function translateRole(role) {
         'keyboard': 'Teclados',
         'mastering': 'Masterización',
         'mastering engineer': 'Ingeniero de masterización',
+        'misc': 'Otros',
         'mix': 'Mezclador',
         'mixing engineer': 'Ingeniero de mezclado',
         'orchestrator': 'Orquestador',
