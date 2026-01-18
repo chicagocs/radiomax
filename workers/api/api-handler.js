@@ -30,7 +30,7 @@ const securityHeaders = {
     "worker-src 'self' blob:; " +
     "style-src 'self' 'unsafe-inline'; " + 
     "img-src 'self' data: https://core.chcs.workers.dev https://e-cdns-images.dzcdn.net https://i.scdn.co; " + 
-    "connect-src 'self' https://api.radioradise.com https://core.chcs.workers.dev https://api.somafm.com https://musicbrainz.org https://*.supabase.co; " +
+    "connect-src 'self' https://api.radioradise.com https://core.chcs.workers.dev https://api.somafm.com https://musicbrainz.org wss://*.supabase.co; " +
     "font-src 'self'; " +
     "manifest-src 'self'; " +
     "base-uri 'self'; " +
