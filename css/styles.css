@@ -1277,3 +1277,7 @@ footer strong { color: var(--text-main); font-weight: bold; }
     border-color: var(--primary);
     transform: translateY(-1px);
 }
+
+@media (max-width: 600px) { .smart-link-text { display: none; } }
+
+@media (max-width: 600px) { .smart-link-text { display: none; } }
