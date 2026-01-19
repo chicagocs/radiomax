@@ -1,5 +1,5 @@
 // workers/api/api-handler.js
-// caché Server-Side integrada
+// caché Server-Side integrada + Request Coalescing (Anti-429)
 
 // ===============================================================
 //  CONFIGURACIÓN DE ENCABEZADOS
@@ -31,7 +31,7 @@ const securityHeaders = {
     "worker-src 'self' blob:; " +
     "style-src 'self' 'unsafe-inline'; " + 
     "img-src 'self' data: https://core.chcs.workers.dev https://e-cdns-images.dzcdn.net https://i.scdn.co; " + 
-    "connect-src 'self' https://api.radioradise.com https://core.chcs.workers.dev https://api.somafm.com https://musicbrainz.org https://*.supabase.co; " +
+    "connect-src 'self' https://api.radioparadise.com https://core.chcs.workers.dev https://api.somafm.com https://musicbrainz.org https://*.supabase.co; " +
     "font-src 'self'; " +
     "manifest-src 'self'; " +
     "base-uri 'self'; " +
@@ -86,14 +86,14 @@ async function getOdesliLinks(spotifyUrl) {
     // Endpoint público de Odesli v1-alpha.1
     const apiUrl = `https://api.song.link/v1-alpha.1/links?url=${encodeURIComponent(spotifyUrl)}&userCountry=AR`;
     
-    // Agregamos User-Agent para simular un navegador real y evitar bloqueos
+    // Agregamos User-Agent para simular un navegador real y evitar bloqueos básicos
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     };
 
     const response = await fetch(apiUrl, { headers });
     
-    // Si la respuesta HTTP no es OK (ej: 404, 500)
+    // Si la respuesta HTTP no es OK (ej: 404, 500, 429)
     if (!response.ok) {
       return { 
         success: false, 
@@ -115,6 +115,13 @@ async function getOdesliLinks(spotifyUrl) {
     return { success: false, error: e.message };
   }
 }
+
+// ===============================================================
+//  GESTIÓN DE COALESCING (Anti-429)
+// ===============================================================
+// Mapa global para almacenar peticiones en curso.
+// Evita que múltiples usuarios simultáneos disparen la misma petición a Odesli.
+const pendingOdesliRequests = new Map();
 
 // ===============================================================
 //  SPOTIFY HANDLER
@@ -200,68 +207,94 @@ async function handleSpotifyRequest(request, env, ctx) {
       const spotifyUrl = track.external_urls?.spotify || "NO_URL";
       
       // =================================================================
-      // CACHÉ KV SERVER-SIDE + ESTRATEGIA NEGATIVE CACHING
+      // CACHÉ KV + COALESCING (Optimización Anti-429)
       // =================================================================
       const cacheKey = `odesli_cache:${spotifyUrl}`;
       let odesliResult;
 
       try {
-          // 1. INTENTAR LEER DESDE KV
+          // 1. INTENTAR LEER DESDE KV (La capa más rápida)
           const cachedData = await env.AREA51_KV.get(cacheKey, { type: 'json' });
           
           if (cachedData) {
               // Verificamos si es una entrada de "Caché Negativo" (un error anterior)
               if (cachedData._cachedError) {
                   console.log(`[KV Cache] NEGATIVE HIT (Protegido): ${spotifyUrl} (Status: ${cachedData.status})`);
-                  // Devolvemos el error cacheado para NO volver a llamar a Odesli inmediatamente
                   odesliResult = { 
                       success: false, 
                       error: cachedData.error, 
                       status: cachedData.status,
-                      isCachedError: true // Flag para identificar origen
+                      isCachedError: true 
                   };
               } else {
                   console.log(`[KV Cache] POSITIVE HIT: ${spotifyUrl}`);
-                  // Es un dato válido exitoso
                   odesliResult = { success: true, data: cachedData };
               }
           } else {
-              console.log(`[KV Cache] MISS: ${spotifyUrl}`);
-              // 2. SI NO EXISTE, LLAMAR A LA API
-              odesliResult = await getOdesliLinks(spotifyUrl);
-
-              // 3. GESTIÓN DE ESCRITURA (POSITIVA O NEGATIVA)
-              if (odesliResult.success) {
-                  // EXITO: Guardar en KV por 7 días
-                  ctx.waitUntil(
-                      env.AREA51_KV.put(cacheKey, JSON.stringify(odesliResult.data), {
-                          expirationTtl: 604800 
-                      })
-                  );
+              // 2. CACHE MISS -> VERIFICAR COALESCING
+              // ¿Ya hay alguien pidiendo este dato a la API externa ahora mismo?
+              if (pendingOdesliRequests.has(cacheKey)) {
+                  console.log(`[Coalescing] Reutilizando petición en curso para: ${spotifyUrl}`);
+                  // Esperamos a que la petición existente termine y usamos su resultado
+                  odesliResult = await pendingOdesliRequests.get(cacheKey);
               } else {
-                  // FALLO: ESTRATEGIA DE CACHÉ NEGATIVO (Negative Caching)
-                  // Si el error es 429 (Rate Limit) o 5xx (Server Error), lo guardamos por poco tiempo
-                  // para evitar "disparar" contra la puerta cerrada.
-                  if (odesliResult.status === 429 || odesliResult.status >= 500) {
-                      console.log(`[KV Cache] Writing NEGATIVE Cache (TTL 60s) for ${spotifyUrl} due to status ${odesliResult.status}`);
-                      
-                      ctx.waitUntil(
-                          env.AREA51_KV.put(cacheKey, JSON.stringify({
-                              _cachedError: true,   // Flag para identificarlo al leer
-                              error: odesliResult.error,
-                              status: odesliResult.status
-                          }), {
-                              expirationTtl: 90 // 90 segundos de tregua (penalty box)
-                          })
-                      );
-                  }
+                  // 3. NUEVA PETICIÓN (Solo la hacemos una vez)
+                  console.log(`[Coalescing] Iniciando nueva petición externa para: ${spotifyUrl}`);
+                  
+                  // Creamos la promesa que hará el fetch
+                  const fetchPromise = (async () => {
+                      try {
+                          const result = await getOdesliLinks(spotifyUrl);
+
+                          // Guardamos resultado en KV para la próxima vez
+                          if (result.success) {
+                              // Éxito: Guardar 7 días
+                              ctx.waitUntil(
+                                  env.AREA51_KV.put(cacheKey, JSON.stringify(result.data), {
+                                      expirationTtl: 604800 
+                                  })
+                              );
+                          } else {
+                              // FALLO: Estrategia de Negative Caching (Penalty Box)
+                              // Si es 429 o error de servidor, guardamos el error para no repetir
+                              if (result.status === 429 || result.status >= 500) {
+                                  console.log(`[KV Cache] NEGATIVE CACHE (TTL 90s) for ${spotifyUrl} due to status ${result.status}`);
+                                  
+                                  ctx.waitUntil(
+                                      env.AREA51_KV.put(cacheKey, JSON.stringify({
+                                          _cachedError: true,
+                                          error: result.error,
+                                          status: result.status
+                                      }), {
+                                          expirationTtl: 90 
+                                      })
+                                  );
+                              }
+                          }
+                          return result;
+                      } catch (e) {
+                           console.error(`[Coalescing] Error inesperado en fetch: ${e.message}`);
+                           return { success: false, error: e.message };
+                      } finally {
+                          // LIMPIEZA: La petición ha terminado, la eliminamos del mapa
+                          pendingOdesliRequests.delete(cacheKey);
+                      }
+                  })();
+
+                  // Guardamos la promesa en el mapa global ANTES de esperarla
+                  pendingOdesliRequests.set(cacheKey, fetchPromise);
+
+                  // Esperamos a que se resuelva
+                  odesliResult = await fetchPromise;
               }
           }
       } catch (kvError) {
           console.error(`[KV Cache] Error: ${kvError.message}. Ignorando caché.`);
-          // Fallback de emergencia: Si KV falla, intentamos llamar a la API normalmente
-          if (!odesliResult) { // Solo llamamos si no tenemos nada previo
-            odesliResult = await getOdesliLinks(spotifyUrl);
+          // Fallback de emergencia: Si KV falla pero hay una petición en memoria, úsala
+          if (pendingOdesliRequests.has(cacheKey)) {
+              odesliResult = await pendingOdesliRequests.get(cacheKey);
+          } else {
+              odesliResult = await getOdesliLinks(spotifyUrl);
           }
       }
       // =================================================================
@@ -353,7 +386,7 @@ async function handleSpotifyRequest(request, env, ctx) {
         resp.links = null;
         resp.odesliError = odesliResult.error;
         
-        // Logueamos solo si es un error nuevo, no uno cacheado (para no ensuciar logs)
+        // Logueamos solo si es un error nuevo, no uno cacheado
         if (!odesliResult.isCachedError) {
             console.error(`Odesli API failed for ${spotifyUrl}:`, odesliResult.error);
         } else {
