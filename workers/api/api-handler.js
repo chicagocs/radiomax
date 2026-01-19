@@ -251,7 +251,7 @@ async function handleSpotifyRequest(request, env, ctx) {
                               // Éxito: Guardar 7 días
                               ctx.waitUntil(
                                   env.AREA51_KV.put(cacheKey, JSON.stringify(result.data), {
-                                      expirationTtl: 604800 
+                                      expirationTtl: 2592000 // 604800 7 dias
                                   })
                               );
                           } else {
