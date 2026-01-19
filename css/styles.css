@@ -1283,7 +1283,7 @@ footer strong { color: var(--text-main); font-weight: bold; }
 }
 
 .smart-link-btn.mobile-os {
-    padding: 5px; /* Un poco más chico verticalmente si solo muestra el emoji */
+    padding: 2px; /* Un poco más chico verticalmente si solo muestra el emoji */
 }
 
 @media (max-width: 600px) { .smart-link-text { display: none; } }
