@@ -1,6 +1,6 @@
-// v3.7.2
+// v4.0
 // Para reflejar cambios en recursos estáticos (CSS, JS, Imágenes) cambiar CACHE_VERSION
-const CACHE_VERSION = 'v3.7.2';
+const CACHE_VERSION = 'v4.0';
 const STATIC_CACHE = `max-static-${CACHE_VERSION}`;
 const API_CACHE = `max-api-${CACHE_VERSION}`;
 
