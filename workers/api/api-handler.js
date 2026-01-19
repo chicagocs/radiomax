@@ -225,7 +225,9 @@ async function handleSpotifyRequest(request, env) {
         trackNumber: null,
         albumTypeDescription: getAlbumTypeDescription(albumData),
         isrc: trackIsrc,
-        links: null // Inicializado, se llenará abajo
+        links: null
+        debugSpotifyUrl: track.external_urls.spotify
+
       };
 
       if (albumData.id) {
