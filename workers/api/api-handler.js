@@ -251,7 +251,7 @@ async function handleSpotifyRequest(request, env, ctx) {
                               error: odesliResult.error,
                               status: odesliResult.status
                           }), {
-                              expirationTtl: 60 // 60 segundos de tregua (penalty box)
+                              expirationTtl: 90 // 90 segundos de tregua (penalty box)
                           })
                       );
                   }
