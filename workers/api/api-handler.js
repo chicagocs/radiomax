@@ -18,19 +18,17 @@ const securityHeaders = {
   "X-Content-Type-Options": "nosniff",
   "X-XSS-Protection": "1; mode=block",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  
   "Permissions-Policy":
     "geolocation=(), microphone=(), camera=(), payment=(), usb=(), " +
     "magnetometer=(), gyroscope=(), accelerometer=(), autoplay=(), " +
     "encrypted-media=(), fullscreen=(self), picture-in-picture=(self), " +
     "interest-cohort=(), sync-xhr=()",
-  
   "Content-Security-Policy":
     "default-src 'none'; " +
-    "script-src 'self' https://core.chcs.workers.dev https://static.cloudflareinsights.com; " + 
+    "script-src 'self' https://core.chcs.workers.dev https://static.cloudflareinsights.com; " +
     "worker-src 'self' blob:; " +
-    "style-src 'self' 'unsafe-inline'; " + 
-    "img-src 'self' data: https://core.chcs.workers.dev https://e-cdns-images.dzcdn.net https://i.scdn.co; " + 
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data: https://core.chcs.workers.dev https://e-cdns-images.dzcdn.net https://i.scdn.co; " +
     "connect-src 'self' https://api.radioparadise.com https://core.chcs.workers.dev https://api.somafm.com https://musicbrainz.org https://*.supabase.co; " +
     "font-src 'self'; " +
     "manifest-src 'self'; " +
@@ -38,7 +36,6 @@ const securityHeaders = {
     "form-action 'self'; " +
     "frame-ancestors 'none'; " +
     "upgrade-insecure-requests",
-  
   "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
   "Cross-Origin-Opener-Policy": "same-origin",
   "Cross-Origin-Embedder-Policy": "require-corp",
@@ -56,7 +53,6 @@ function cleanSearchTerm(term) {
 function getAlbumTypeDescription(album) {
   const name = album.name.toLowerCase();
   const type = album.album_type;
-
   const reissueKeywords = [
     "remastered",
     "deluxe",
@@ -66,61 +62,47 @@ function getAlbumTypeDescription(album) {
     "reissue",
     "legacy"
   ];
-
   if (type === "compilation") return "Compilación";
   if (type === "single") return "Sencillo";
-  if (reissueKeywords.some((k) => name.includes(k))) return "Reedición";
-
+  if (reissueKeywords.some(k => name.includes(k))) return "Reedición";
   return "Álbum";
 }
 
 // ===============================================================
-//  ODESLI / SONGLINK HANDLER (VERSIÓN DEPURADA)
+//  ODESLI HANDLER
 // ===============================================================
-/**
- * Obtiene los enlaces universales.
- * Devuelve un objeto con { success: bool, data: ..., error: ... }
- */
 async function getOdesliLinks(spotifyUrl) {
   try {
-    // Endpoint público de Odesli v1-alpha.1
     const apiUrl = `https://api.song.link/v1-alpha.1/links?url=${encodeURIComponent(spotifyUrl)}&userCountry=AR`;
-    
-    // Agregamos User-Agent para simular un navegador real y evitar bloqueos básicos
     const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     };
 
     const response = await fetch(apiUrl, { headers });
-    
-    // Si la respuesta HTTP no es OK (ej: 404, 500, 429)
+
     if (!response.ok) {
-      return { 
-        success: false, 
-        status: response.status, 
-        error: `HTTP Error ${response.status}: ${response.statusText}` 
+      return {
+        success: false,
+        status: response.status,
+        error: `HTTP Error ${response.status}: ${response.statusText}`
       };
     }
 
     const data = await response.json();
-    
-    // Si la API no devuelve pageUrl (aunque sea 200 OK, a veces no encuentra la canción)
     if (!data || !data.pageUrl) {
       return { success: false, error: "Odesli found no pageUrl in response" };
     }
-    
-    return { success: true, data: data };
 
+    return { success: true, data };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
 // ===============================================================
-//  GESTIÓN DE COALESCING (Anti-429)
+//  COALESCING
 // ===============================================================
-// Mapa global para almacenar peticiones en curso.
-// Evita que múltiples usuarios simultáneos disparen la misma petición a Odesli.
 const pendingOdesliRequests = new Map();
 
 // ===============================================================
@@ -131,374 +113,133 @@ async function handleSpotifyRequest(request, env, ctx) {
     const url = new URL(request.url);
     const artist = cleanSearchTerm(url.searchParams.get("artist"));
     const title = cleanSearchTerm(url.searchParams.get("title"));
-    const album = cleanSearchTerm(url.searchParams.get("album"));
 
     if (!artist || !title) {
-      return new Response(
-        JSON.stringify({ error: 'Faltan los parámetros "artist" y "title".' }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
-    }
-
-    const clientId = env.SPOTIFY_CLIENT_ID;
-    const clientSecret = env.SPOTIFY_CLIENT_SECRET;
-
-    if (!clientId || !clientSecret) {
-      return new Response(
-        JSON.stringify({ error: "Credenciales de Spotify no configuradas" }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
-    }
-
-    const authString = btoa(`${clientId}:${clientSecret}`);
-    const tokenResponse = await fetch(
-      "https://accounts.spotify.com/api/token",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${authString}`,
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: "grant_type=client_credentials"
-      }
-    );
-
-    if (!tokenResponse.ok) throw new Error("No se pudo obtener token de Spotify");
-    const accessToken = (await tokenResponse.json()).access_token;
-
-    let searchData = null;
-    let responseSpotify = null;
-
-    // Estrategia de búsqueda: Con album -> Exacta -> Suave
-    if (album) {
-      const q = `track:"${title}" artist:"${artist}" album:"${album}"`;
-      responseSpotify = await fetch(
-        `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=5`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      if (responseSpotify.ok) searchData = await responseSpotify.json();
-    }
-
-    if (!searchData || searchData.tracks.items.length === 0) {
-      const q = `track:"${title}" artist:"${artist}"`;
-      responseSpotify = await fetch(
-        `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=5`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      if (responseSpotify.ok) searchData = await responseSpotify.json();
-    }
-
-    if (!searchData || searchData.tracks.items.length === 0) {
-      const q = `${artist} ${title}`;
-      responseSpotify = await fetch(
-        `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=5`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      if (responseSpotify.ok) searchData = await responseSpotify.json();
-    }
-
-    if (!responseSpotify.ok) throw new Error("Error en búsqueda de Spotify");
-
-    if (searchData && searchData.tracks.items.length > 0) {
-      const track = searchData.tracks.items[0];
-      const albumData = track.album;
-      
-      // Variables para depuración
-      const spotifyUrl = track.external_urls?.spotify || "NO_URL";
-      
-      // =================================================================
-      // CACHÉ KV + COALESCING (Optimización Anti-429)
-      // =================================================================
-      const cacheKey = `odesli_cache:${spotifyUrl}`;
-      let odesliResult;
-
-      try {
-          // 1. INTENTAR LEER DESDE KV (La capa más rápida)
-          const cachedData = await env.AREA51_KV.get(cacheKey, { type: 'json' });
-          
-          if (cachedData) {
-              // Verificamos si es una entrada de "Caché Negativo" (un error anterior)
-              if (cachedData._cachedError) {
-                  console.log(`[KV Cache] NEGATIVE HIT (Protegido): ${spotifyUrl} (Status: ${cachedData.status})`);
-                  odesliResult = { 
-                      success: false, 
-                      error: cachedData.error, 
-                      status: cachedData.status,
-                      isCachedError: true 
-                  };
-              } else {
-                  console.log(`[KV Cache] POSITIVE HIT: ${spotifyUrl}`);
-                  odesliResult = { success: true, data: cachedData };
-              }
-          } else {
-              // 2. CACHE MISS -> VERIFICAR COALESCING
-              // ¿Ya hay alguien pidiendo este dato a la API externa ahora mismo?
-              if (pendingOdesliRequests.has(cacheKey)) {
-                  console.log(`[Coalescing] Reutilizando petición en curso para: ${spotifyUrl}`);
-                  // Esperamos a que la petición existente termine y usamos su resultado
-                  odesliResult = await pendingOdesliRequests.get(cacheKey);
-              } else {
-                  // 3. NUEVA PETICIÓN (Solo la hacemos una vez)
-                  console.log(`[Coalescing] Iniciando nueva petición externa para: ${spotifyUrl}`);
-                  
-                  // Creamos la promesa que hará el fetch
-                  const fetchPromise = (async () => {
-                      try {
-                          const result = await getOdesliLinks(spotifyUrl);
-
-                          // Guardamos resultado en KV para la próxima vez
-                          if (result.success) {
-                              // Éxito: Guardar 7 días
-                              ctx.waitUntil(
-                                  env.AREA51_KV.put(cacheKey, JSON.stringify(result.data), {
-                                      expirationTtl: 604800 
-                                  })
-                              );
-                          } else {
-                              // FALLO: Estrategia de Negative Caching (Penalty Box)
-                              // Si es 429 o error de servidor, guardamos el error para no repetir
-                              if (result.status === 429 || result.status >= 500) {
-                                  console.log(`[KV Cache] NEGATIVE CACHE (TTL 90s) for ${spotifyUrl} due to status ${result.status}`);
-                                  
-                                  ctx.waitUntil(
-                                      env.AREA51_KV.put(cacheKey, JSON.stringify({
-                                          _cachedError: true,
-                                          error: result.error,
-                                          status: result.status
-                                      }), {
-                                          expirationTtl: 600 
-                                      })
-                                  );
-                              }
-                          }
-                          return result;
-                      } catch (e) {
-                           console.error(`[Coalescing] Error inesperado en fetch: ${e.message}`);
-                           return { success: false, error: e.message };
-                      } finally {
-                          // LIMPIEZA: La petición ha terminado, la eliminamos del mapa
-                          pendingOdesliRequests.delete(cacheKey);
-                      }
-                  })();
-
-                  // Guardamos la promesa en el mapa global ANTES de esperarla
-                  pendingOdesliRequests.set(cacheKey, fetchPromise);
-
-                  // Esperamos a que se resuelva
-                  odesliResult = await fetchPromise;
-              }
-          }
-      } catch (kvError) {
-          console.error(`[KV Cache] Error: ${kvError.message}. Ignorando caché.`);
-          // Fallback de emergencia: Si KV falla pero hay una petición en memoria, úsala
-          if (pendingOdesliRequests.has(cacheKey)) {
-              odesliResult = await pendingOdesliRequests.get(cacheKey);
-          } else {
-              odesliResult = await getOdesliLinks(spotifyUrl);
-          }
-      }
-      // =================================================================
-
-      let trackIsrc = null;
-      if (track.id) {
-          try {
-              const trackResponse = await fetch(
-                  `https://api.spotify.com/v1/tracks/${track.id}`,
-                  { headers: { Authorization: `Bearer ${accessToken}` } }
-              );
-              if (trackResponse.ok) {
-                  const fullTrack = await trackResponse.json();
-                  trackIsrc = fullTrack.external_ids?.isrc || null;
-              }
-          } catch (e) {
-              console.error("Error obteniendo ISRC:", e);
-          }
-      }
-
-      const resp = {
-        imageUrl: albumData.images?.[0]?.url ?? null,
-        release_date: albumData.release_date ?? null,
-        label: albumData.label ?? null,
-        genres: [],
-        duration: Math.floor(track.duration_ms / 1e3),
-        totalTracks: albumData.total_tracks ?? null,
-        totalAlbumDuration: 0,
-        trackNumber: null,
-        albumTypeDescription: getAlbumTypeDescription(albumData),
-        isrc: trackIsrc,
-        links: null,
-        
-        // ================= CAMPOS DE DEPURACIÓN (DEBUG) =================
-        debugSpotifyUrl: spotifyUrl,
-        odesliError: null
-        // =================================================================
-      };
-
-      if (albumData.id) {
-        try {
-          const full = await fetch(
-            `https://api.spotify.com/v1/albums/${albumData.id}`,
-            { headers: { Authorization: `Bearer ${accessToken}` } }
-          );
-          if (full.ok) {
-            const fullAlbum = await full.json();
-            resp.label = fullAlbum.label ?? resp.label;
-            if (fullAlbum.tracks?.items) {
-              resp.totalAlbumDuration = fullAlbum.tracks.items.reduce(
-                (sum, t) => sum + t.duration_ms,
-                0
-              );
-              const idx = fullAlbum.tracks.items.findIndex(
-                (t) => t.id === track.id
-              );
-              if (idx !== -1) resp.trackNumber = idx + 1;
-            }
-          }
-        } catch {
-        }
-      }
-
-      if (track.artists.length > 0) {
-        const tasks = track.artists.slice(0, 3).map(async (a) => {
-          try {
-            const r = await fetch(
-              `https://api.spotify.com/v1/artists/${a.id}`,
-              { headers: { Authorization: `Bearer ${accessToken}` } }
-            );
-            return r.ok ? (await r.json()).genres ?? [] : [];
-          } catch {
-            return [];
-          }
-        });
-        resp.genres = [...new Set((await Promise.all(tasks)).flat())];
-      }
-
-      // Procesar el resultado de Odesli
-      if (odesliResult.success) {
-        // EXITO
-        resp.links = {
-          universalLink: odesliResult.data.pageUrl,
-          platforms: odesliResult.data.linksByPlatform || {}
-        };
-        resp.odesliError = null;
-      } else {
-        // FALLO (Real o Cacheado)
-        resp.links = null;
-        resp.odesliError = odesliResult.error;
-        
-        // Logueamos solo si es un error nuevo, no uno cacheado
-        if (!odesliResult.isCachedError) {
-            console.error(`Odesli API failed for ${spotifyUrl}:`, odesliResult.error);
-        } else {
-            console.log(`Odesli API bypassed for ${spotifyUrl} (serving cached error).`);
-        }
-      }
-
-      return new Response(JSON.stringify(resp), {
-        status: 200,
+      return new Response(JSON.stringify({ error: "Faltan parámetros" }), {
+        status: 400,
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    return new Response(
-      JSON.stringify({
-        imageUrl: null,
-        release_date: null,
-        label: null,
-        genres: [],
-        duration: 0,
-        totalTracks: null,
-        totalAlbumDuration: 0,
-        trackNumber: null,
-        albumTypeDescription: null,
-        isrc: null,
-        links: null,
-        debugSpotifyUrl: "NOT_FOUND",
-        odesliError: "Track not found in Spotify"
-      }),
-      {
+    const authString = btoa(`${env.SPOTIFY_CLIENT_ID}:${env.SPOTIFY_CLIENT_SECRET}`);
+    const tokenResp = await fetch("https://accounts.spotify.com/api/token", {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${authString}`,
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: "grant_type=client_credentials"
+    });
+
+    if (!tokenResp.ok) throw new Error("Token Spotify inválido");
+    const { access_token } = await tokenResp.json();
+
+    const searchResp = await fetch(
+      `https://api.spotify.com/v1/search?q=${encodeURIComponent(
+        `${artist} ${title}`
+      )}&type=track&limit=1`,
+      { headers: { Authorization: `Bearer ${access_token}` } }
+    );
+
+    const searchData = await searchResp.json();
+    if (!searchData.tracks.items.length) {
+      return new Response(JSON.stringify({ error: "Track no encontrado" }), {
         status: 404,
         headers: { "Content-Type": "application/json" }
-      }
-    );
-  } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Error interno Spotify", details: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
-  }
-}
-
-// ===============================================================
-//  RADIO PARADISE HANDLER
-// ===============================================================
-async function handleRadioParadiseRequest(request) {
-  try {
-    const url = new URL(request.url);
-    const path = url.searchParams.get("url");
-
-    if (!path) {
-      return new Response(
-        JSON.stringify({ error: 'Se requiere "url".' }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+      });
     }
 
-    const targetUrl = `https://api.radioparadise.com/${path}`;
+    const track = searchData.tracks.items[0];
+    const spotifyUrl = track.external_urls.spotify;
+    const cacheKey = `odesli_cache:${spotifyUrl}`;
+    let odesliResult;
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const cached = await env.AREA51_KV.get(cacheKey, { type: "json" });
+    if (cached) {
+      odesliResult = cached._cachedError
+        ? { success: false, ...cached, isCachedError: true }
+        : { success: true, data: cached };
+    } else if (pendingOdesliRequests.has(cacheKey)) {
+      odesliResult = await pendingOdesliRequests.get(cacheKey);
+    } else {
+      const fetchPromise = (async () => {
+        try {
+          const result = await getOdesliLinks(spotifyUrl);
 
-    const apiResp = await fetch(targetUrl, { signal: controller.signal });
-    clearTimeout(timeout);
+          if (result.success) {
+            ctx.waitUntil(
+              env.AREA51_KV.put(cacheKey, JSON.stringify(result.data), {
+                expirationTtl: 604800
+              })
+            );
+          } else if (result.status === 429 || result.status >= 500) {
+            const negativeTtl =
+              result.status === 429 ? 900 :
+              result.status >= 500 ? 300 :
+              90;
 
-    return new Response(apiResp.body, apiResp);
+            ctx.waitUntil(
+              env.AREA51_KV.put(
+                cacheKey,
+                JSON.stringify({
+                  _cachedError: true,
+                  error: result.error,
+                  status: result.status
+                }),
+                { expirationTtl: negativeTtl }
+              )
+            );
+          }
 
-  } catch (err) {
+          return result;
+        } finally {
+          pendingOdesliRequests.delete(cacheKey);
+        }
+      })();
+
+      pendingOdesliRequests.set(cacheKey, fetchPromise);
+      odesliResult = await fetchPromise;
+    }
+
     return new Response(
-      JSON.stringify({ error: "Proxy RP error", details: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      JSON.stringify({
+        spotifyUrl,
+        links: odesliResult.success ? odesliResult.data : null,
+        odesliError: odesliResult.success ? null : odesliResult.error
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
     );
+  } catch (e) {
+    return new Response(JSON.stringify({ error: e.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
   }
 }
 
 // ===============================================================
-//  MÓDULO EXPORTADO
+//  EXPORT
 // ===============================================================
 export default {
   async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-    let response;
-
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 200, headers: corsHeaders });
     }
 
-    if (url.pathname.startsWith("/spotify")) {
-      // Se pasa 'ctx' para permitir operaciones en segundo plano (caché)
+    let response;
+    if (new URL(request.url).pathname.startsWith("/spotify")) {
       response = await handleSpotifyRequest(request, env, ctx);
-    } else if (url.pathname.startsWith("/radioparadise")) {
-      response = await handleRadioParadiseRequest(request);
     } else {
-      if (env.ASSETS) {
-        try {
-          response = await env.ASSETS.fetch(request);
-        } catch (err) {
-          response = await env.ASSETS.fetch(new Request("/index.html", request));
-        }
-      } else {
-        response = new Response("<h1>OK</h1>", { status: 200, headers: { "Content-Type": "text/html" } });
-      }
+      response = new Response("OK");
     }
 
-    const finalHeaders = new Headers(response.headers);
-    Object.entries(corsHeaders).forEach(([key, value]) => finalHeaders.set(key, value));
-    Object.entries(securityHeaders).forEach(([key, value]) => finalHeaders.set(key, value));
-       
+    const headers = new Headers(response.headers);
+    Object.entries(corsHeaders).forEach(([k, v]) => headers.set(k, v));
+    Object.entries(securityHeaders).forEach(([k, v]) => headers.set(k, v));
+
     return new Response(response.body, {
       status: response.status,
-      statusText: response.statusText,
-      headers: finalHeaders
+      headers
     });
   }
 };
