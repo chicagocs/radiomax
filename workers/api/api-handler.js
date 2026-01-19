@@ -74,42 +74,44 @@ function getAlbumTypeDescription(album) {
 }
 
 // ===============================================================
-//  ODESLI / SONGLINK HANDLER
+//  ODESLI / SONGLINK HANDLER (VERSIÓN DEPURADA)
 // ===============================================================
+/**
+ * Obtiene los enlaces universales.
+ * Devuelve un objeto con { success: bool, data: ..., error: ... }
+ */
 async function getOdesliLinks(spotifyUrl) {
   try {
     // Endpoint público de Odesli v1-alpha.1
-    // Mejora: Añadimos userCountry (AR por defecto) para evitar geo-restrictions básicas
     const apiUrl = `https://api.song.link/v1-alpha.1/links?url=${encodeURIComponent(spotifyUrl)}&userCountry=AR`;
     
-    // MEJORA: Agregamos User-Agent para que la API no nos bloquee por ser un Cloudflare Worker
+    // Agregamos User-Agent para simular un navegador real y evitar bloqueos
     const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     };
 
     const response = await fetch(apiUrl, { headers });
     
-    // DIAGNÓSTICO: Si falla, logueamos el status para verlo en Wrangler
+    // Si la respuesta HTTP no es OK (ej: 404, 500)
     if (!response.ok) {
-        console.error(`Odesli Error Status: ${response.status} for url: ${spotifyUrl}`);
-        return null;
+      return { 
+        success: false, 
+        status: response.status, 
+        error: `HTTP Error ${response.status}: ${response.statusText}` 
+      };
     }
 
     const data = await response.json();
     
-    // Si data está vacío o no tiene pageUrl, devolvemos null
+    // Si la API no devuelve pageUrl (aunque sea 200 OK, a veces no encuentra la canción)
     if (!data || !data.pageUrl) {
-        console.warn("Odesli response empty or no pageUrl");
-        return null;
+      return { success: false, error: "Odesli found no pageUrl in response" };
     }
     
-    return {
-      universalLink: data.pageUrl,
-      platforms: data.linksByPlatform || {}
-    };
+    return { success: true, data: data };
+
   } catch (e) {
-    console.error("Exception fetching Odesli links:", e);
-    return null;
+    return { success: false, error: e.message };
   }
 }
 
@@ -193,10 +195,11 @@ async function handleSpotifyRequest(request, env) {
       const track = searchData.tracks.items[0];
       const albumData = track.album;
       
-      // INICIO: Llamada paralela a Odesli (para no bloquear la carga principal)
-      const spotifyUrl = track.external_urls.spotify;
-      const odesliPromise = getOdesliLinks(spotifyUrl);
-      // FIN: Llamada paralela
+      // Variables para depuración
+      const spotifyUrl = track.external_urls?.spotify || "NO_URL";
+      
+      // Iniciamos la petición a Odesli (Paralela)
+      const odesliResultPromise = getOdesliLinks(spotifyUrl);
 
       let trackIsrc = null;
       if (track.id) {
@@ -225,9 +228,12 @@ async function handleSpotifyRequest(request, env) {
         trackNumber: null,
         albumTypeDescription: getAlbumTypeDescription(albumData),
         isrc: trackIsrc,
-        links: null
-        debugSpotifyUrl: track.external_urls.spotify
-
+        links: null,
+        
+        // ================= CAMPOS DE DEPURACIÓN (DEBUG) =================
+        debugSpotifyUrl: spotifyUrl,
+        odesliError: null
+        // =================================================================
       };
 
       if (albumData.id) {
@@ -269,14 +275,22 @@ async function handleSpotifyRequest(request, env) {
         resp.genres = [...new Set((await Promise.all(tasks)).flat())];
       }
 
-      // Esperar resultado de Odesli y añadir a la respuesta
-      try {
-        const odesliData = await odesliPromise;
-        if (odesliData) {
-          resp.links = odesliData;
-        }
-      } catch (e) {
-        console.warn("Odesli failed silently", e);
+      // Resolvemos la promesa de Odesli
+      const odesliResult = await odesliResultPromise;
+
+      if (odesliResult.success) {
+        // EXITO
+        resp.links = {
+          universalLink: odesliResult.data.pageUrl,
+          platforms: odesliResult.data.linksByPlatform || {}
+        };
+        resp.odesliError = null;
+      } else {
+        // FALLO: Guardamos el error en el JSON para que el cliente lo vea
+        resp.links = null;
+        resp.odesliError = odesliResult.error;
+        // También logueamos en consola del worker
+        console.error(`Odesli failed for ${spotifyUrl}:`, odesliResult.error);
       }
 
       return new Response(JSON.stringify(resp), {
@@ -297,7 +311,9 @@ async function handleSpotifyRequest(request, env) {
         trackNumber: null,
         albumTypeDescription: null,
         isrc: null,
-        links: null
+        links: null,
+        debugSpotifyUrl: "NOT_FOUND",
+        odesliError: "Track not found in Spotify"
       }),
       {
         status: 404,
@@ -335,7 +351,6 @@ async function handleRadioParadiseRequest(request) {
     const apiResp = await fetch(targetUrl, { signal: controller.signal });
     clearTimeout(timeout);
 
-    // Devolvemos la respuesta directamente. El router principal se encargará de añadir los encabezados.
     return new Response(apiResp.body, apiResp);
 
   } catch (err) {
@@ -347,50 +362,37 @@ async function handleRadioParadiseRequest(request) {
 }
 
 // ===============================================================
-//  MÓDULO EXPORTADO (EL NUEVO FETCH HANDLER)
+//  MÓDULO EXPORTADO
 // ===============================================================
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     let response;
 
-    // 1. Manejar solicitudes OPTIONS (preflight de CORS)
     if (request.method === "OPTIONS") {
-      // La respuesta OPTIONS solo necesita los encabezados CORS
       return new Response(null, { status: 200, headers: corsHeaders });
     }
 
-    // 2. Enrutamiento a los manejadores de lógica de negocio
     if (url.pathname.startsWith("/spotify")) {
       response = await handleSpotifyRequest(request, env);
     } else if (url.pathname.startsWith("/radioparadise")) {
       response = await handleRadioParadiseRequest(request);
     } else {
-      // Servir archivos estáticos desde ASSETS
       if (env.ASSETS) {
         try {
           response = await env.ASSETS.fetch(request);
         } catch (err) {
-          // SPA fallback: siempre servir index.html si no se encuentra el archivo
           response = await env.ASSETS.fetch(new Request("/index.html", request));
         }
       } else {
-        // Fallback simple si no hay Assets
         response = new Response("<h1>OK</h1>", { status: 200, headers: { "Content-Type": "text/html" } });
       }
     }
 
-    // 3. Aplicar encabezados finales a la respuesta
-    //    Aquí es donde combinamos los encabezados CORS y de seguridad.
     const finalHeaders = new Headers(response.headers);
-    
-    // Añadir encabezados CORS
     Object.entries(corsHeaders).forEach(([key, value]) => finalHeaders.set(key, value));
-    
-    // Añadir encabezados de seguridad
     Object.entries(securityHeaders).forEach(([key, value]) => finalHeaders.set(key, value));
        
-    // Crear la respuesta final con todos los encabezados
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
