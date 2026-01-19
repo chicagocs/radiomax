@@ -1278,6 +1278,12 @@ footer strong { color: var(--text-main); font-weight: bold; }
     transform: translateY(-1px);
 }
 
-@media (max-width: 600px) { .smart-link-text { display: none; } }
+.smart-link-btn.mobile-os .smart-link-text {
+    display: none;
+}
+
+.smart-link-btn.mobile-os {
+    padding: 5px 10px; /* Un poco más chico verticalmente si solo muestra el emoji */
+}
 
 @media (max-width: 600px) { .smart-link-text { display: none; } }
