@@ -41,24 +41,23 @@ const trackIsrc = document.getElementById('trackIsrc');
 const shareButton = document.getElementById('shareButton');
 const shareOptions = document.getElementById('shareOptions');
 const shareWhatsApp = document.getElementById('shareWhatsApp');
-// ========================================================
-// NUEVO: Selección del botón Smart Link (Odesli)
-// ========================================================
 const smartLinkButton = document.getElementById('smartLinkButton');
-// ========================================================
-
 const notification = document.getElementById('notification');
-
 const installPwaInvitation = document.getElementById('install-pwa-invitation');
 const closeInvitationBtn = document.getElementById('close-invitation');
 const installWindowsBtn = document.getElementById('install-windows');
 const installAndroidBtn = document.getElementById('install-android');
 const installIosBtn = document.getElementById('install-ios');
-
 const welcomeScreen = document.getElementById('welcomeScreen');
 const playbackInfo = document.getElementById('playbackInfo');
 const playerHeader = document.querySelector('.player-header');
 const filterToggleStar = document.getElementById('filterToggleStar');
+    
+const isMobileOS = /Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent);
+const smartLinkBtn = document.getElementById('smartLinkButton');
+if (isMobileOS && smartLinkBtn) {
+    smartLinkBtn.classList.add('mobile-os');
+}    
 
 let stationsById = {};
 let currentStation = null;
