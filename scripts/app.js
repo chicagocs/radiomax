@@ -985,33 +985,34 @@ async function fetchSongDetails(artist, title, album, fetchId) {
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const d = await res.json();
         
-        if (d && d.imageUrl) {
-            displayAlbumCoverFromUrl(d.imageUrl);
-            
-            // =================================================================
-            // ACTUALIZACIÓN: Pasamos d.links a la función de detalles
-            // =================================================================
-            updateAlbumDetailsWithSpotifyData(d, d.links);
-            // =================================================================
-            
-            if (d.duration) {
-                trackDuration = d.duration;
-                const m = Math.floor(trackDuration / 60);
-                const s = Math.floor(trackDuration % 60);
-                totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-            }
-            // Capturamos el ISRC si Spotify lo tiene
-            if (d.isrc) {
-                spotifyIsrc = d.isrc;
-            }
-            
-            // MEJORA: Guardamos el artista y título exactos de Spotify para usarlos si falla el ISRC
-            if (d.artists && Array.isArray(d.artists)) {
-                spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
-            }
-            if (d.title) {
-                spotifyCleanTitle = d.title;
-            }
+        // Solo verificamos si 'd' existe, no si tiene imagen
+        if (d) {
+    
+        if (d.imageUrl) {
+         displayAlbumCoverFromUrl(d.imageUrl);
+        }
+    
+        updateAlbumDetailsWithSpotifyData(d, d.links);
+
+        if (d.duration) {
+          trackDuration = d.duration;
+          const m = Math.floor(trackDuration / 60);
+          const s = Math.floor(trackDuration % 60);
+          totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        }
+    
+        // Capturamos el ISRC si Spotify lo tiene
+        if (d.isrc) {
+           spotifyIsrc = d.isrc;
+        }
+    
+        // MEJORA: Guardamos el artista y título exactos de Spotify...
+        if (d.artists && Array.isArray(d.artists)) {
+          spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
+        }
+           if (d.title) {
+              spotifyCleanTitle = d.title;
+           }
         }
         
         // Llamamos a MusicBrainz pasando los datos de Spotify para el rescate
