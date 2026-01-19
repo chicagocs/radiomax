@@ -76,27 +76,39 @@ function getAlbumTypeDescription(album) {
 // ===============================================================
 //  ODESLI / SONGLINK HANDLER
 // ===============================================================
-/**
- * Obtiene los enlaces universales (Smart Links) usando Odesli.
- * @param {string} spotifyUrl - URL completa de la canción en Spotify.
- * @returns {Promise<Object|null>} Objeto con pageUrl y platforms.
- */
 async function getOdesliLinks(spotifyUrl) {
   try {
     // Endpoint público de Odesli v1-alpha.1
-    const apiUrl = `https://api.song.link/v1-alpha.1/links?url=${encodeURIComponent(spotifyUrl)}`;
+    // Mejora: Añadimos userCountry (AR por defecto) para evitar geo-restrictions básicas
+    const apiUrl = `https://api.song.link/v1-alpha.1/links?url=${encodeURIComponent(spotifyUrl)}&userCountry=AR`;
     
-    const response = await fetch(apiUrl);
-    if (!response.ok) return null;
+    // MEJORA: Agregamos User-Agent para que la API no nos bloquee por ser un Cloudflare Worker
+    const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    };
+
+    const response = await fetch(apiUrl, { headers });
+    
+    // DIAGNÓSTICO: Si falla, logueamos el status para verlo en Wrangler
+    if (!response.ok) {
+        console.error(`Odesli Error Status: ${response.status} for url: ${spotifyUrl}`);
+        return null;
+    }
 
     const data = await response.json();
     
+    // Si data está vacío o no tiene pageUrl, devolvemos null
+    if (!data || !data.pageUrl) {
+        console.warn("Odesli response empty or no pageUrl");
+        return null;
+    }
+    
     return {
-      universalLink: data.pageUrl, // El link inteligente principal (song.link)
-      platforms: data.linksByPlatform || {} // Enlaces específicos (Spotify, Apple, etc.)
+      universalLink: data.pageUrl,
+      platforms: data.linksByPlatform || {}
     };
   } catch (e) {
-    console.error("Error fetching Odesli links:", e);
+    console.error("Exception fetching Odesli links:", e);
     return null;
   }
 }
