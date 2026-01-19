@@ -1254,7 +1254,7 @@ footer strong { color: var(--text-main); font-weight: bold; }
     justify-content: center;
     
     /* Estilos visuales ajustados a tu tema actual */
-    padding: 2px 8px;
+    padding: 2px;
     background-color: #333;
     color: var(--text-main);
     text-decoration: none;
