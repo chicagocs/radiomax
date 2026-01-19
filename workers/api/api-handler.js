@@ -266,7 +266,7 @@ async function handleSpotifyRequest(request, env, ctx) {
                                           error: result.error,
                                           status: result.status
                                       }), {
-                                          expirationTtl: 90 
+                                          expirationTtl: 600 
                                       })
                                   );
                               }
