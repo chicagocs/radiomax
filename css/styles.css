@@ -1243,25 +1243,37 @@ footer strong { color: var(--text-main); font-weight: bold; }
    ENLACES ODESLI
    ========================================================================== */
 
+/* ==========================================================================
+   ENLACES ODESLI
+   ========================================================================== */
+
 .smart-link-btn {
-    display: none; /* Oculto por defecto */
+    display: none; 
+    
     align-items: center;
     justify-content: center;
-    padding: 10px 20px;
-    margin: 5px 0;
+    
+    /* Estilos visuales ajustados a tu tema actual */
+    padding: 2px 8px;
     background-color: #333;
-    color: #fff;
+    color: var(--text-main);
     text-decoration: none;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
-    font-size: 14px;
-    transition: opacity 0.3s;
+    
+    font-size: 11px;
+    font-weight: bold;
+    
+    transition: all var(--transition) ease;
 }
 
 .smart-link-btn.visible {
-    display: flex; /* Aparece cuando JS lo activa */
+    display: inline-flex;
 }
 
 .smart-link-btn:hover {
-    opacity: 0.8;
-    background-color: #444;
+    background-color: var(--primary);
+    color: var(--bg-dark);
+    border-color: var(--primary);
+    transform: translateY(-1px);
 }
