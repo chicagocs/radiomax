@@ -200,7 +200,7 @@ async function handleSpotifyRequest(request, env, ctx) {
       const spotifyUrl = track.external_urls?.spotify || "NO_URL";
       
       // =================================================================
-      // CACHÉ KV SERVER-SIDE (Para evitar Error 429 de Odesli)
+      // CACHÉ KV SERVER-SIDE + ESTRATEGIA NEGATIVE CACHING
       // =================================================================
       const cacheKey = `odesli_cache:${spotifyUrl}`;
       let odesliResult;
@@ -210,29 +210,59 @@ async function handleSpotifyRequest(request, env, ctx) {
           const cachedData = await env.AREA51_KV.get(cacheKey, { type: 'json' });
           
           if (cachedData) {
-              console.log(`[KV Cache] HIT: ${spotifyUrl}`);
-              // Si existe, simulamos el éxito inmediatamente
-              odesliResult = { success: true, data: cachedData };
+              // Verificamos si es una entrada de "Caché Negativo" (un error anterior)
+              if (cachedData._cachedError) {
+                  console.log(`[KV Cache] NEGATIVE HIT (Protegido): ${spotifyUrl} (Status: ${cachedData.status})`);
+                  // Devolvemos el error cacheado para NO volver a llamar a Odesli inmediatamente
+                  odesliResult = { 
+                      success: false, 
+                      error: cachedData.error, 
+                      status: cachedData.status,
+                      isCachedError: true // Flag para identificar origen
+                  };
+              } else {
+                  console.log(`[KV Cache] POSITIVE HIT: ${spotifyUrl}`);
+                  // Es un dato válido exitoso
+                  odesliResult = { success: true, data: cachedData };
+              }
           } else {
               console.log(`[KV Cache] MISS: ${spotifyUrl}`);
               // 2. SI NO EXISTE, LLAMAR A LA API
               odesliResult = await getOdesliLinks(spotifyUrl);
 
-              // 3. SI LA API TUVO ÉXITO, GUARDAR EN KV (ASINCRÓNICO)
+              // 3. GESTIÓN DE ESCRITURA (POSITIVA O NEGATIVA)
               if (odesliResult.success) {
-                  // ctx.waitUntil permite que la respuesta se envíe al usuario 
-                  // inmediatamente mientras Worker guarda el caché en segundo plano.
+                  // EXITO: Guardar en KV por 7 días
                   ctx.waitUntil(
                       env.AREA51_KV.put(cacheKey, JSON.stringify(odesliResult.data), {
-                          expirationTtl: 604800 // 7 Días (604800 segundos)
+                          expirationTtl: 604800 
                       })
                   );
+              } else {
+                  // FALLO: ESTRATEGIA DE CACHÉ NEGATIVO (Negative Caching)
+                  // Si el error es 429 (Rate Limit) o 5xx (Server Error), lo guardamos por poco tiempo
+                  // para evitar "disparar" contra la puerta cerrada.
+                  if (odesliResult.status === 429 || odesliResult.status >= 500) {
+                      console.log(`[KV Cache] Writing NEGATIVE Cache (TTL 60s) for ${spotifyUrl} due to status ${odesliResult.status}`);
+                      
+                      ctx.waitUntil(
+                          env.AREA51_KV.put(cacheKey, JSON.stringify({
+                              _cachedError: true,   // Flag para identificarlo al leer
+                              error: odesliResult.error,
+                              status: odesliResult.status
+                          }), {
+                              expirationTtl: 60 // 60 segundos de tregua (penalty box)
+                          })
+                      );
+                  }
               }
           }
       } catch (kvError) {
           console.error(`[KV Cache] Error: ${kvError.message}. Ignorando caché.`);
-          // Fallback: Si KV falla, intentamos llamar a la API normalmente
-          odesliResult = await getOdesliLinks(spotifyUrl);
+          // Fallback de emergencia: Si KV falla, intentamos llamar a la API normalmente
+          if (!odesliResult) { // Solo llamamos si no tenemos nada previo
+            odesliResult = await getOdesliLinks(spotifyUrl);
+          }
       }
       // =================================================================
 
@@ -310,7 +340,7 @@ async function handleSpotifyRequest(request, env, ctx) {
         resp.genres = [...new Set((await Promise.all(tasks)).flat())];
       }
 
-      // Procesar el resultado de Odesli (puede venir del Cache o de la API)
+      // Procesar el resultado de Odesli
       if (odesliResult.success) {
         // EXITO
         resp.links = {
@@ -319,11 +349,16 @@ async function handleSpotifyRequest(request, env, ctx) {
         };
         resp.odesliError = null;
       } else {
-        // FALLO: Guardamos el error en el JSON para que el cliente lo vea
+        // FALLO (Real o Cacheado)
         resp.links = null;
         resp.odesliError = odesliResult.error;
-        // También logueamos en consola del worker
-        console.error(`Odesli failed for ${spotifyUrl}:`, odesliResult.error);
+        
+        // Logueamos solo si es un error nuevo, no uno cacheado (para no ensuciar logs)
+        if (!odesliResult.isCachedError) {
+            console.error(`Odesli API failed for ${spotifyUrl}:`, odesliResult.error);
+        } else {
+            console.log(`Odesli API bypassed for ${spotifyUrl} (serving cached error).`);
+        }
       }
 
       return new Response(JSON.stringify(resp), {
