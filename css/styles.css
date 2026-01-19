@@ -1238,3 +1238,30 @@ footer strong { color: var(--text-main); font-weight: bold; }
     border-right: 1px solid var(--primary);
     border-bottom: 1px solid var(--primary);
 }
+
+/* ==========================================================================
+   ENLACES ODESLI
+   ========================================================================== */
+
+.smart-link-btn {
+    display: none; /* Oculto por defecto */
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    margin: 5px 0;
+    background-color: #333;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: opacity 0.3s;
+}
+
+.smart-link-btn.visible {
+    display: flex; /* Aparece cuando JS lo activa */
+}
+
+.smart-link-btn:hover {
+    opacity: 0.8;
+    background-color: #444;
+}
