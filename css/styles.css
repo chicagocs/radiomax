@@ -1286,4 +1286,4 @@ footer strong { color: var(--text-main); font-weight: bold; }
     padding: 2px; /* Un poco más chico verticalmente si solo muestra el emoji */
 }
 
-@media (max-width: 450px) { .smart-link-text { display: none; } }
+@media (max-width: 480px) { .smart-link-text { display: none; } }
