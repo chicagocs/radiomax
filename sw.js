@@ -191,15 +191,20 @@ self.addEventListener('message', event => {
 
 async function handleNavigation(request) {
   try {
-    const response = await fetch(request);
-    // Cachear HTML exitoso para offline
+    // FIX: Crear una nueva petición usando la URL como string.
+    // Esto evita el error "Failed to fetch" causado por reutilizar el objeto 'request' original.
+    const response = await fetch(request.url);
+
+    // Cachear HTML exitoso
     if (response.ok && response.headers.get('content-type')?.includes('text/html')) {
       const cache = await caches.open(STATIC_CACHE);
+      // PUT requests with `response.clone()` are handled differently by some browsers,
+      // but since we are fetching a fresh request, this works well.
       cache.put(request, response.clone()).catch(() => {});
     }
     return response;
   } catch (error) {
-    console.warn('[SW] Navigation failed, serving offline page');
+    // Fallback a offline.html
     return caches.match('/offline.html', { cacheName: STATIC_CACHE }) ||
            new Response('Offline', { status: 503 });
   }
