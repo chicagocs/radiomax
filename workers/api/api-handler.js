@@ -1,5 +1,5 @@
 // workers/api/api-handler.js
-// caché Server-Side integrada + Request Coalescing (Sin Negative Caching)
+// caché Server-Side integrada + Request Coalescing
 
 // ===============================================================
 //  CONFIGURACIÓN DE ENCABEZADOS
@@ -75,7 +75,7 @@ function getAlbumTypeDescription(album) {
 }
 
 // ===============================================================
-//  ODESLI / SONGLINK HANDLER (VERSIÓN ESTÁNDAR)
+//  ODESLI / SONGLINK HANDLER
 // ===============================================================
 /**
  * Obtiene los enlaces universales.
@@ -83,18 +83,14 @@ function getAlbumTypeDescription(album) {
  */
 async function getOdesliLinks(spotifyUrl) {
   try {
-    // Endpoint público de Odesli v1-alpha.1
     const apiUrl = `https://api.song.link/v1-alpha.1/links?url=${encodeURIComponent(spotifyUrl)}&userCountry=AR`;
     
-    // User-Agent para simular navegador real
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     };
 
     const response = await fetch(apiUrl, { headers });
     
-    // Si la respuesta HTTP no es OK (ej: 404, 500, 429)
-    // Nota: Aquí devolvemos el error directamente. No hay Penalty Box.
     if (!response.ok) {
       return { 
         success: false, 
@@ -119,8 +115,6 @@ async function getOdesliLinks(spotifyUrl) {
 // ===============================================================
 //  GESTIÓN DE COALESCING (Anti-Thundering Herd)
 // ===============================================================
-// Este mapa permite que múltiples usuarios pidiendo la misma canción
-// al mismo tiempo compartan una sola petición.
 const pendingOdesliRequests = new Map();
 
 // ===============================================================
@@ -205,40 +199,31 @@ async function handleSpotifyRequest(request, env, ctx) {
       
       const spotifyUrl = track.external_urls?.spotify || "NO_URL";
       const cacheKey = `odesli_cache:${spotifyUrl}`;
-      
       let odesliResult;
 
       // =================================================================
-      // LÓGICA DE CACHÉ Y COALESCING (SIN NEGATIVE CACHING)
+      // CACHÉ KV + COALESCING (Sin Jitter)
       // =================================================================
       try {
-          // 1. CHECK CACHÉ KV
           const cachedData = await env.AREA51_KV.get(cacheKey, { type: 'json' });
           
           if (cachedData) {
-              console.log(`[KV Cache] HIT: ${spotifyUrl}`);
+              console.log(`[KV Cache] POSITIVE HIT: ${spotifyUrl}`);
               odesliResult = { success: true, data: cachedData };
           } else {
-              // 2. CHECK COALESCING (Petición en curso)
+              // CHECK DE COALESCING (Petición en curso)
               if (pendingOdesliRequests.has(cacheKey)) {
-                  console.log(`[Coalescing] Reutilizando petición en curso: ${spotifyUrl}`);
+                  console.log(`[Coalescing] Reutilizando petición en curso para: ${spotifyUrl}`);
                   odesliResult = await pendingOdesliRequests.get(cacheKey);
               } else {
-                  // 3. NEW REQUEST (Nueva Petición)
                   console.log(`[Coalescing] Iniciando nueva petición externa para: ${spotifyUrl}`);
                   
                   const fetchPromise = (async () => {
                       try {
-                          // Jitter: Pequeño retraso aleatorio para "desfasar" al manada
-                          const jitter = Math.floor(Math.random() * 500); 
-                          if (process.env.NODE_ENV !== 'test') {
-                              await new Promise(resolve => setTimeout(resolve, jitter));
-                          }
-
-                          // FETCH A ODESLI
+                          // FETCH A ODESLI (Sin delay, inmediato)
                           const result = await getOdesliLinks(spotifyUrl);
 
-                          // SOLO GUARDAR SI ES ÉXITO (Sin Penalty Box)
+                          // Solo guardamos si es éxito
                           if (result.success) {
                               ctx.waitUntil(
                                   env.AREA51_KV.put(cacheKey, JSON.stringify(result.data), {
@@ -246,28 +231,27 @@ async function handleSpotifyRequest(request, env, ctx) {
                                   })
                               );
                           }
-                          
                           return result;
                       } catch (e) {
-                           console.error(`[Coalescing] Error inesperado: ${e.message}`);
+                           console.error(`[Coalescing] Error inesperado en fetch: ${e.message}`);
                            return { success: false, error: e.message };
                       } finally {
-                          // Liberar mapa global
                           pendingOdesliRequests.delete(cacheKey);
                       }
                   })();
 
-                  // Guardar promesa en mapa global inmediatamente
                   pendingOdesliRequests.set(cacheKey, fetchPromise);
                   odesliResult = await fetchPromise;
               }
           }
       } catch (kvError) {
           console.error(`[KV Cache] Error: ${kvError.message}. Fallback directo.`);
-          // Fallback: Si KV falla, intentar fetch directo (sin map para evitar race conditions complejos)
-          odesliResult = await getOdesliLinks(spotifyUrl);
+          if (pendingOdesliRequests.has(cacheKey)) {
+              odesliResult = await pendingOdesliRequests.get(cacheKey);
+          } else {
+              odesliResult = await getOdesliLinks(spotifyUrl);
+          }
       }
-
       // =================================================================
 
       let trackIsrc = null;
@@ -341,7 +325,6 @@ async function handleSpotifyRequest(request, env, ctx) {
         resp.genres = [...new Set((await Promise.all(tasks)).flat())];
       }
 
-      // Procesar resultado Odesli
       if (odesliResult.success) {
         resp.links = {
           universalLink: odesliResult.data.pageUrl,
@@ -351,7 +334,6 @@ async function handleSpotifyRequest(request, env, ctx) {
       } else {
         resp.links = null;
         resp.odesliError = odesliResult.error;
-        // Loguear error en consola
         console.error(`Odesli API failed for ${spotifyUrl}:`, odesliResult.error);
       }
 
@@ -436,7 +418,6 @@ export default {
     }
 
     if (url.pathname.startsWith("/spotify")) {
-      // Se pasa 'ctx' para permitir operaciones en segundo plano (caché)
       response = await handleSpotifyRequest(request, env, ctx);
     } else if (url.pathname.startsWith("/radioparadise")) {
       response = await handleRadioParadiseRequest(request);
