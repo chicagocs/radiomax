@@ -1865,14 +1865,17 @@ if (shareWhatsApp) {
             const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
             if (isBrave) {
                 showNotification('En Brave, toca el enlace para abrir WhatsApp Web');
-                setTimeout(() => { window.open(`https://wa.me/?text=${encodeURIComponent(m)`, '_blank'); }, 1000);
+                // CORREGIDO: Agregada la comilla invertida de cierre
+                setTimeout(() => { window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank'); }, 1000);
             } else if (isMob) {
                 const uri = `whatsapp://send?text=${encodeURIComponent(m)}`;
                 const link = document.createElement('a');
                 link.href = uri; link.target = '_blank'; link.rel = 'noopener noreferrer';
                 document.body.appendChild(link); link.click(); document.body.removeChild(link);
+                // CORREGIDO: Agregada la comilla invertida de cierre
                 setTimeout(() => { window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank'); }, 1500);
-            } else window.open(`https://wa.me/?text=${encodeURIComponent(m)`, '_blank');
+            // CORREGIDO: Agregada la comilla invertida de cierre
+            } else window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank');
             if (shareOptions) shareOptions.classList.remove('active');
         } else showNotification('Por favor, espera a que comience una canción para compartir');
     });
@@ -1929,7 +1932,7 @@ document.addEventListener('keydown', function(event) {
             if (name.startsWith(key)) matches.push(opt);
         });
         if (matches.length > 0) {
-            if (key === lastKeyPressed) { lastMatchIndex = (lastMatchIndex + 1) % matches.length; } // CORREGIDO: Eliminado paréntesis extra
+            if (key === lastKeyPressed) { lastMatchIndex = (lastMatchIndex + 1) % matches.length; }
             else { lastMatchIndex = 0; lastKeyPressed = key; }
             const opt = matches[lastMatchIndex];
             const id = opt.dataset.value;
@@ -1941,7 +1944,7 @@ document.addEventListener('keydown', function(event) {
             const custom = document.querySelector('.custom-select-wrapper');
             const trig = custom.querySelector('.custom-select-trigger');
             const st = stationsById[id];
-            let txt = st.service === 'radioparadise' ? (st.name.split(' - ')[1] || st.name) : st.name; // CORREGIDO: Operador ternario correcto
+            let txt = st.service === 'radioparadise' ? st.name.split(' - ')[1] || st.name : st.name;
             trig.textContent = txt;
             custom.querySelectorAll('.custom-option').forEach(o => o.classList.remove('selected'));
             opt.classList.add('selected');
