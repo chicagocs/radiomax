@@ -21,7 +21,7 @@ const securityHeaders = {
   "Referrer-Policy": "strict-origin-when-cross-origin",
   
   "Permissions-Policy":
-    "geolocation=(), microphone=(), camera=(), payment=(), usb=(), " + " +
+    "geolocation=(), microphone=(), camera=(), payment=(), usb=(), " +
     "magnetometer=(), gyroscope=(), accelerometer=(), autoplay=(), " + 
     "encrypted-media=(), fullscreen=(self), picture-in-picture=(self), " + 
     "interest-cohort=(), sync-xhr=()",
