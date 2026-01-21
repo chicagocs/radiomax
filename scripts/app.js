@@ -991,14 +991,14 @@ async function fetchSongDetails(artist, title, album, fetchId) {
         if (fetchId !== currentSongFetchId) return;
         // =================================================================
         
-        // Solo verificamos si 'd' existe, no si tiene imagen
+        // Solo verificamos si 'd' existe
         if (d) {
             // ========================================
-            // NUEVO: Lazy Load Setup
+            // NUEVO: Lazy Load Setup + FIX debugSpotifyUrl
             // ========================================
-            // Guardamos el link seguro de Spotify y mostramos el botón
-            if (d.external_urls && d.external_urls.spotify) {
-                currentSpotifyUrl = d.external_urls.spotify;
+            // Usamos debugSpotifyUrl porque tu worker lo devuelve así
+            if (d.debugSpotifyUrl) {
+                currentSpotifyUrl = d.debugSpotifyUrl;
             }
             
             if (d.imageUrl) {
@@ -1314,10 +1314,7 @@ function updateAlbumDetailsWithSpotifyData(d, links) {
 // =======================================================================
 
 // =======================================================================
-// NUEVO: EVENTO CLICK PARA SMART LINK (Lazy Load)
-// =======================================================================
-// =======================================================================
-// NUEVO: EVENTO CLICK PARA SMART LINK (Lazy Load + Rescue)
+// NUEVO: EVENTO CLICK PARA SMART LINK (Lazy Load + Rescue + FIX debugSpotifyUrl)
 // =======================================================================
 if (smartLinkButton) {
     smartLinkButton.addEventListener('click', async function(e) {
@@ -1344,9 +1341,9 @@ if (smartLinkButton) {
                     const res = await fetch(u);
                     if (res.ok) {
                         const d = await res.json();
-                        if (d && d.external_urls && d.external_urls.spotify) {
-                            // ¡Éxito! Guardamos y continuamos el flujo normal
-                            currentSpotifyUrl = d.external_urls.spotify;
+                        // FIX: Usar debugSpotifyUrl para el rescate
+                        if (d && d.debugSpotifyUrl) {
+                            currentSpotifyUrl = d.debugSpotifyUrl;
                         }
                     }
                 }
@@ -1387,7 +1384,6 @@ if (smartLinkButton) {
         } catch (err) {
             console.warn("Error Odesli/Lazy Load, usando fallback Spotify:", err);
             // FALLBACK: Si falla (429, red, etc.), ir directo a Spotify
-            // Como ya verificamos arriba que currentSpotifyUrl existe, esto es seguro
             window.open(currentSpotifyUrl, '_blank');
         }
     });
