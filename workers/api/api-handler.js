@@ -13,7 +13,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS"
 };
 
-// Encabezados de seguridad (CORREGIDO SINTAXIS)
+// Encabezados de seguridad (SINTAXIS CORREGIDA)
 const securityHeaders = {
   "X-Frame-Options": "SAMEORIGIN",
   "X-Content-Type-Options": "nosniff",
@@ -24,8 +24,9 @@ const securityHeaders = {
     "geolocation=(), microphone=(), camera=(), payment=(), usb=(), " +
     "magnetometer=(), gyroscope=(), accelerometer=(), autoplay=(), " +
     "encrypted-media=(), fullscreen=(self), picture-in-picture=(self), " +
-    "interest-cohort=(), sync-xhr=(), " +
-    "Content-Security-Policy":
+    "interest-cohort=(), sync-xhr=()", // <-- CERRADO AQUÍ (Quitado el '+' que causaba el error)
+  
+  "Content-Security-Policy": // <-- Ahora es una clave válida del objeto
     "default-src 'none'; " +
     "script-src 'self' https://core.chcs.workers.dev https://static.cloudflareinsights.com; " + 
     "worker-src 'self' blob:; " +
@@ -36,8 +37,9 @@ const securityHeaders = {
     "manifest-src 'self'; " + 
     "base-uri 'self'; " + 
     "form-action 'self'; " + 
-    "frame-ancestors: // none"; " + 
+    "frame-ancestors 'none'; " + 
     "upgrade-insecure-requests",
+  
   "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
   "Cross-Origin-Opener-Policy": "same-origin",
   "Cross-Origin-Embedder-Policy": "require-corp",
@@ -171,10 +173,10 @@ async function handleSpotifyRequest(request, env, ctx) {
     }
 
     if (!searchData || searchData.tracks.items.length === 0) {
-      const q = `track:"${title}" artist:"${artist}" album:"${album}"`; // <-- CORREGIDO: Quité redundancia en la lógica de búsqueda
+      const q = `track:"${title}" artist:"${artist}" album:"${album}"`; 
       
       responseSpotify = await fetch(
-        `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=5`, // <-- CORREGIDO: Quité duplicado (copiar y pegar error anterior)
+        `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=5`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       if (responseSpotify.ok) searchData = await responseSpotify.json();
@@ -214,9 +216,6 @@ async function handleSpotifyRequest(request, env, ctx) {
                   console.log(`[Coalescing] Reutilizando petición en curso para: ${spotifyUrl}`);
                   odesliResult = await pendingOdesliRequests.get(cacheKey);
               } else {
-                  // =================================================================
-                  // LÓGICA IMPORTANTE: SOLO SI EL USUARIO HA HECHO CLICAR (linksOnly === "true")
-                  // =================================================================
                   console.log(`[Coalescing] Iniciando nueva petición externa para: ${spotifyUrl} (Usuario clic en botón: ${linksOnlyParam})`);
 
                   const fetchPromise = (async () => {
@@ -433,7 +432,7 @@ export default {
           response = await env.ASSETS.fetch(new Request("/index.html", request));
         }
       } else {
-        response = new Response("<h1>OK</h1>", { status: 200, headers: { "Content-Type": "text/html" });
+        response = new Response("<h1>OK</h1>", { status: 200, headers: { "Content-Type": "text/html" } });
       }
     }
 
