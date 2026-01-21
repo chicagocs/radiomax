@@ -707,8 +707,8 @@ if (smartLinkButton) {
             smartLinkButton.style.opacity = "0.7";
 
             try {
-                // CAMBIO CRÍTICO: Usar la URL absoluta del Worker
-                const res = await fetch(`https://core.chcs.workers.dev/odesli?url=${encodeURIComponent(currentSpotifyUrl)}`);
+                const cacheBuster = `&_t=${Date.now()}`;
+                const res = await fetch(`https://core.chcs.workers.dev/odesli?url=${encodeURIComponent(currentSpotifyUrl)}${cacheBuster}`);
 
                 if (!res.ok) {
                     throw new Error(`Servidor respondió con error ${res.status}`);
