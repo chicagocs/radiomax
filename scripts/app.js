@@ -1450,6 +1450,7 @@ function startCountdown() {
                     if (currentStation?.service === 'somafm') {
                         if (currentStation?.service === 'somafm') updateSongInfo(true);
                         else { if (rapidCheckInterval) { clearInterval(rapidCheckInterval); rapidCheckInterval = null; } }
+                    }
                 }, 2000); 
             }
         };
@@ -1648,7 +1649,6 @@ if (volumeSlider) {
         updateVolumeIconPosition();
         if (this.value == 0) { volumeIcon.classList.add('muted'); isMuted = true; }
         else { volumeIcon.classList.remove('muted'); isMuted = false; previousVolume = this.value; }
-        else { volumeIcon.classList.remove('muted'); isMuted = false; previousVolume = this.value; }
         updateVolumeIconPosition();
     });
 }
@@ -1696,7 +1696,7 @@ const connectionManager = {
     maxReconnectAttempts:5,
     initialReconnectDelay: 1000,
     maxReconnectDelay: 30000,
-    reconnectTimeoutId = null,
+    reconnectTimeoutId: null, // CORREGIDO: Usar ':' en lugar de '='
     audioCheckInterval: null,
     start() {
         if (this.isReconnecting) return;
@@ -1799,6 +1799,7 @@ window.addEventListener('focus', () => {
                 facebookVideoDetected = false;
                 if (pageFocusCheckInterval) { clearInterval(pageFocusCheckInterval); pageFocusCheckInterval = null; }
             }, 30000);
+        }
     }
 });
 
@@ -1928,7 +1929,7 @@ document.addEventListener('keydown', function(event) {
             if (name.startsWith(key)) matches.push(opt);
         });
         if (matches.length > 0) {
-            if (key === lastKeyPressed) { lastMatchIndex = (lastMatchIndex +1) % matches.length); }
+            if (key === lastKeyPressed) { lastMatchIndex = (lastMatchIndex + 1) % matches.length; } // CORREGIDO: Eliminado paréntesis extra
             else { lastMatchIndex = 0; lastKeyPressed = key; }
             const opt = matches[lastMatchIndex];
             const id = opt.dataset.value;
@@ -1940,8 +1941,7 @@ document.addEventListener('keydown', function(event) {
             const custom = document.querySelector('.custom-select-wrapper');
             const trig = custom.querySelector('.custom-select-trigger');
             const st = stationsById[id];
-            let txt = st.name;
-            if (st.service === 'radioparadise') txt = st.name.split(' - ')[1] || st.name : st.name;
+            let txt = st.service === 'radioparadise' ? (st.name.split(' - ')[1] || st.name) : st.name; // CORREGIDO: Operador ternario correcto
             trig.textContent = txt;
             custom.querySelectorAll('.custom-option').forEach(o => o.classList.remove('selected'));
             opt.classList.add('selected');
