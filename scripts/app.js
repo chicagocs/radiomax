@@ -683,7 +683,7 @@ function startRadioParadisePolling() {
 }
 
 // =======================================================================
-// LÓGICA: ODESLI ON-CLICK (CORRECCIÓN DE DOMINIO)
+// LÓGICA: ODESLI ON-CLICK
 // =======================================================================
 let currentSpotifyUrl = null;
 let currentSmartLink = null;
@@ -692,21 +692,23 @@ if (smartLinkButton) {
     smartLinkButton.addEventListener('click', async (e) => {
         e.preventDefault();
         
-        // 1. Si ya tenemos el enlace, abrirlo
+        // 1. Si ya tenemos el enlace, abrirlo y salir
         if (currentSmartLink) {
             window.open(currentSmartLink, '_blank');
             return;
         }
 
         // 2. Si no, pedirlo al servidor
-        // CORRECCIÓN AQUÍ: Apuntamos a 'https://core.chcs.workers.dev/odesli'
-        // en lugar de '/odesli' para que el Worker maneje la petición.
         if (currentSpotifyUrl && currentSpotifyUrl !== "NO_URL") {
-            const originalText = smartLinkButton.textContent;
+            // FIX CRÍTICO: Guardamos innerHTML en lugar de textContent
+            // Esto preserva spans/divs internos necesarios para el CSS
+            const originalHTML = smartLinkButton.innerHTML;
+            
             smartLinkButton.textContent = "Cargando...";
             smartLinkButton.style.opacity = "0.7";
 
             try {
+                // Generamos cacheBuster para evitar que el navegador cacheé la respuesta HTML del error anterior
                 const cacheBuster = `&_t=${Date.now()}`;
                 const res = await fetch(`https://core.chcs.workers.dev/odesli?url=${encodeURIComponent(currentSpotifyUrl)}${cacheBuster}`);
 
@@ -727,7 +729,9 @@ if (smartLinkButton) {
                 console.error("Error fetching Odesli:", err);
                 showNotification("No se pudo obtener el enlace");
             } finally {
-                smartLinkButton.textContent = originalText;
+                // FIX: Restauramos innerHTML en lugar de textContent
+                // Esto recupera el icono y la estructura para que el CSS oculte el texto si corresponde
+                smartLinkButton.innerHTML = originalHTML;
                 smartLinkButton.style.opacity = "1";
             }
         } else {
