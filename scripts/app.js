@@ -86,7 +86,7 @@ let rapidCheckInterval = null;
 let songTransitionDetected = false;
 let isUpdatingSongInfo = false;
 let currentCredits = "";
-let currentSpotifyUrl = ""; // Variable para guardar el link seguro de Spotify (Lazy Load)
+let currentSpotifyUrl = ""; 
 const RAPID_CHECK_THRESHOLD = 150;
 audioPlayer.volume = 0.5;
 
@@ -103,15 +103,12 @@ function getUserUniqueID() {
 }
 
 async function joinStation(stationId) {
-    // FIX: Chequeo inicial para evitar subscripciones dobles o nulas
     if (stationId === currentStationId) return;
 
-    // Si hay un canal activo y el ID es diferente, salir primero (limpieza atómica)
     if (currentChannel) {
         await leaveStation(currentStationId);
     }
     
-    // Asignar ID inmediatamente para evitar race conditions con llamadas rápidas externas
     currentStationId = stationId;
     
     const channelName = `station:${stationId}`;
@@ -132,16 +129,11 @@ async function joinStation(stationId) {
         })
         .subscribe(async (status) => {
             if (status === 'SUBSCRIBED') {
-                // 1. Enviar estado inicial
                 await channel.track({
                     user_at: new Date().toISOString(),
                     agent: navigator.userAgent
                 });
 
-                // =================================================================
-                // NUEVO: SISTEMA ANTI-PAUSA (HEARTBEAT)
-                // =================================================================
-                // Esto envía una señal cada 45 segundos para mantener el proyecto activo
                 if (keepAliveInterval) clearInterval(keepAliveInterval);
                 
                 keepAliveInterval = setInterval(async () => {
@@ -153,7 +145,7 @@ async function joinStation(stationId) {
                     } catch (err) {
                         console.warn('Error enviando heartbeat:', err);
                     }
-                }, 45000); // 45000ms = 45 segundos
+                }, 45000);
             }
         });
 
@@ -161,18 +153,15 @@ async function joinStation(stationId) {
 }
 
 async function leaveStation(stationId) {
-    // 1. Detener el Heartbeat primero
     if (keepAliveInterval) {
         clearInterval(keepAliveInterval);
         keepAliveInterval = null;
     }
 
     if (currentChannel) {
-        // FIX: Try-catch para evitar errores en consola al desconectar canales durante cambios rápidos de estación
         try {
             await supabase.removeChannel(currentChannel);
         } catch (err) {
-            // Ignoramos errores de "WebSocket closed" durante cambios rápidos de estación
             if (!err.message.includes('closed')) {
                 console.warn('Error al dejar canal (ignorado):', err);
             }
@@ -241,23 +230,18 @@ function updateVolumeIconPosition() {
     volumeIcon.style.left = `${newPosition}px`;
 }
 
-// CORRECCIÓN APLICADA: updateTooltipPosition no borra el texto "--" al pasar el mouse
 function updateTooltipPosition() {
     const referenceEl = document.getElementById('trackCredits');
     const tooltipEl = document.getElementById('tooltip-credits');
     
-    // Si no hay créditos o no están cargados, ocultamos el tooltip JS
     if (!referenceEl || !tooltipEl || currentCredits === '') {
         if(tooltipEl) tooltipEl.style.opacity = '0';
-        // No tocamos referenceEl.textContent para permitir que se mantenga 'N/A'
         return;
     }
 
-    // Configuración del tooltip
     tooltipEl.style.opacity = '0'; 
     tooltipEl.style.visibility = 'visible';
 
-    // Usar Floating UI para calcular posición arriba (Top)
     computePosition(referenceEl, tooltipEl, {
         placement: 'top',
         strategy: 'absolute',
@@ -269,7 +253,6 @@ function updateTooltipPosition() {
             })
         ]
     }).then(({x, y, placement}) => {
-        // Aplicar coordenadas
         Object.assign(tooltipEl.style, {
             left: `${x}px`,
             top: `${y}px`,
@@ -307,7 +290,6 @@ function showNotification(message) {
 function showInstallInvitation() {
     if (window.matchMedia('(display-mode: standalone)').matches || installInvitationTimeout) return;
     
-    // FIX: Mejora de UX - Verificar si el usuario ya descartó la invitación anteriormente
     if (localStorage.getItem('rm_pwa_invite_dismissed') === 'true') return;
 
     let os = 'other';
@@ -315,9 +297,6 @@ function showInstallInvitation() {
     else if (/iphone|ipad|ipod/i.test(navigator.userAgent)) os = 'ios';
     else if (/win/i.test(navigator.userAgent)) os = 'windows';
 
-    // ======================================================================
-    // FIX: Desactivar invitación "Mejorar la experiencia" en Windows
-    // ======================================================================
     if (os === 'windows') return;
 
     [installWindowsBtn, installAndroidBtn, installIosBtn].forEach(btn => btn.classList.add('disabled'));
@@ -689,15 +668,11 @@ async function loadStations() {
             }
         }
 
-        // =================================================================
-        // NUEVO: AUTO-PLAY DESDE URL PARAMETERS
-        // =================================================================
         const urlParams = new URLSearchParams(window.location.search);
         const startStationId = urlParams.get('station');
         if (startStationId && stationsById[startStationId]) {
             console.log("URL detectada. Iniciando estación:", startStationId);
             stationSelect.value = startStationId;
-            // Disparar evento change para activar CustomSelect UI y playStation
             stationSelect.dispatchEvent(new Event('change'));
         }
 
@@ -892,11 +867,9 @@ async function updateSomaFmInfo(bypassRateLimit = false) {
                 trackDuration = 0;
                 startCountdown();
                 
-                // FIX: Generar ID y pasarlo para controlar responses antiguas
                 const fetchId = Date.now() + Math.random();
                 currentSongFetchId = fetchId;
                 
-                // PASAMOS linksOnly=false para NO GASTAR CUOTA EN SEGUNDO PLANO
                 fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId, false)
                     .catch(e => console.error("Error fetchSongDetails (background):", e));
                 
@@ -921,7 +894,6 @@ async function updateRadioParadiseInfo(bypassRateLimit = false) {
     isUpdatingSongInfo = true;
     try {
         const w = 'https://core.chcs.workers.dev/radioparadise';
-        // FIX #1: ?? asegura que channelId 0 no se reemplace por 1
         const p = `api/now_playing?chan=${currentStation.channelId ?? 1}`;
         const u = `${w}?url=${encodeURIComponent(p)}`;
         const res = await fetch(u);
@@ -940,11 +912,9 @@ async function updateRadioParadiseInfo(bypassRateLimit = false) {
             else { trackStartTime = Date.now() - 15000; trackDuration = 0; }
             startCountdown();
             
-            // FIX: Generar ID y pasarlo para controlar responses antiguas
             const fetchId = Date.now() + Math.random();
             currentSongFetchId = fetchId;
 
-            // PASAMOS linksOnly=false para NO GASTAR CUOTA EN SEGUNDO PLANO
             fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId, false)
                 .catch(e => console.error("Error fetchSongDetails (background):", e));
         }
@@ -977,29 +947,18 @@ async function fetchSongDetails(artist, title, album, fetchId, fetchLinksActive 
     const sAl = album ? album.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "") : "";
     
     let spotifyIsrc = null;
-    // Variables para guardar los nombres limpios de Spotify
     let spotifyCleanArtist = '';
     let spotifyCleanTitle = '';
 
     try {
-        // NUEVO: PASAMOS linksOnly = false para evitar gastar cuota en segundo plano
         const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(sA)}&title=${encodeURIComponent(sT)}&album=${encodeURIComponent(sAl)}&linksOnly=${fetchLinksActive}`;
         const res = await fetch(u);
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const d = await res.json();
         
-        // =================================================================
-        // Muro de Seguridad 1: Verificar ANTES de actualizar UI de Spotify
-        // =================================================================
         if (fetchId !== currentSongFetchId) return;
-        // =================================================================
         
-        // Solo verificamos si 'd' existe
         if (d) {
-            // ========================================
-            // NUEVO: Lazy Load Setup + FIX debugSpotifyUrl
-            // ========================================
-            // Usamos debugSpotifyUrl porque tu worker lo devuelve así
             if (d.debugSpotifyUrl) {
                 currentSpotifyUrl = d.debugSpotifyUrl;
             }
@@ -1008,7 +967,6 @@ async function fetchSongDetails(artist, title, album, fetchId, fetchLinksActive 
                 displayAlbumCoverFromUrl(d.imageUrl);
             }
             
-            // Pasamos null en 'links' para NO activar la lógica antigua de Odesli
             updateAlbumDetailsWithSpotifyData(d, null);
 
             if (d.duration) {
@@ -1018,12 +976,10 @@ async function fetchSongDetails(artist, title, album, fetchId, fetchLinksActive 
               totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
             }
         
-            // Capturamos el ISRC si Spotify lo tiene
             if (d.isrc) {
                spotifyIsrc = d.isrc;
             }
         
-            // MEJORA: Guardamos el artista y título exactos de Spotify...
             if (d.artists && Array.isArray(d.artists)) {
               spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
             }
@@ -1031,7 +987,6 @@ async function fetchSongDetails(artist, title, album, fetchId, fetchLinksActive 
                   spotifyCleanTitle = d.title;
                }
                
-            // Hacemos visible el botón manualmente aquí, ya que tenemos datos válidos
             if (smartLinkButton) {
                 smartLinkButton.classList.add('visible');
             }
@@ -1039,7 +994,6 @@ async function fetchSongDetails(artist, title, album, fetchId, fetchLinksActive 
             smartLinkButton.classList.remove('visible');
         }
         
-        // Llamamos a MusicBrainz pasando los datos de Spotify para el rescate
         await getMusicBrainzDuration(sA, sT, sAl, spotifyIsrc, fetchId, spotifyCleanArtist, spotifyCleanTitle);
         
     } catch (e) {
@@ -1073,9 +1027,8 @@ function formatCreditsList(relations) {
 
     return sortedRoles.map(role => {
         const names = roleMap[role].join(', ');
-        // Envolver en <div> ... </div> y mover dos puntos dentro de <b>
         return `<div><b>${role}</b> ${names}</div>`;
-    }).join(''); // Usar '' en lugar de '<br>'
+    }).join(''); 
 }
     
 // ==========================================================================
@@ -1088,7 +1041,6 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
     try {
         let recordingId = null;
 
-        // --- PRIORIDAD 1: BÚSQUEDA POR ISRC ---
         if (isrc) {
             try {
                 const isrcUrl = `https://musicbrainz.org/ws/2/isrc/${isrc}?inc=artist-rels&fmt=json`;
@@ -1099,7 +1051,6 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
                     if (data.recordings && data.recordings.length > 0) {
                         const r = data.recordings[0];
                         
-                        // Lógica de duración...
                         if (r.length && trackDuration === 0) {
                             trackDuration = Math.floor(r.length / 1000);
                             const m = Math.floor(trackDuration / 60);
@@ -1107,7 +1058,6 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
                             totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
                         }
 
-                        // Lógica de créditos
                         const creditsElement = document.getElementById('trackCredits');
                         if (creditsElement && r.relations) {
                             const artistRelations = r.relations.filter(rel => rel.type && rel.artist);
@@ -1122,16 +1072,13 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
                                 
                                 const tooltipContent = document.getElementById('tooltip-credits-content');
                                 if (tooltipContent) {
-                                    // FIX JS: Forzar estilos para asegurar visualización correcta
-                                    // FIX: REMOVER whiteSpace = 'normal' para permitir que CSS pre-wrap funcione
                                     tooltipContent.innerHTML = creditHtml;
                                 }
                             } else {
                                 if (fetchId !== currentSongFetchId) return;
                                 
-                                // FIX: Mostrar N/A y limpiar atributos para evitar datos fantasma
                                 creditsElement.textContent = 'S/D';
-                                creditsElement.title = ''; // LIMPIAR TITLE NATIVO AQUI
+                                creditsElement.title = ''; 
                                 creditsElement.style.borderBottom = 'none';
                                 
                                 currentCredits = "";
@@ -1148,7 +1095,6 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
             } catch (isrcError) {}
         }
 
-        // --- PRIORIDAD 2: BÚSQUEDA POR TÍTULO ---
         const searchArtist = spotifyArtist ? spotifyArtist : artist;
         const searchTitle = spotifyTitle ? spotifyTitle : title;
 
@@ -1176,11 +1122,7 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
             try {
                 await new Promise(resolve => setTimeout(resolve, 1100)); 
                 
-                // =================================================================
-                // Muro de Seguridad 3: Verificar DESPUÉS del Sleep (Punto Crítico)
-                // =================================================================
                 if (fetchId !== currentSongFetchId) return;
-                // =================================================================
                 
                 const creditsUrl = `https://musicbrainz.org/ws/2/recording/${recordingId}?inc=artist-rels&fmt=json`;
                 const creditsRes = await fetch(creditsUrl, { headers: { 'User-Agent': 'RadioStreamingPlayer/1.0 (https://radiomax.tramax.com.ar)' } });
@@ -1202,16 +1144,13 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
                                 
                             const tooltipContent = document.getElementById('tooltip-credits-content');
                             if (tooltipContent) {
-                                // FIX JS: Forzar estilos (y quitar whiteSpace override)
                                 tooltipContent.innerHTML = creditHtml;
-                                // FIX: REMOVER whiteSpace = 'normal' para permitir que CSS pre-wrap funcione
                             }
                         } else {
                             if (fetchId !== currentSongFetchId) return;
                             
-                            // FIX: Mostrar N/A y limpiar atributos para evitar datos fantasma
                             creditsElement.textContent = 'S/D';
-                            creditsElement.title = ''; // LIMPIAR TITLE NATIVO AQUI
+                            creditsElement.title = ''; 
                             creditsElement.style.borderBottom = 'none';
                             
                             currentCredits = "";
@@ -1270,19 +1209,14 @@ function translateRole(role) {
         'vocal arranger': 'Arreglos en voz',
         'writer': 'Escritor'
     };
-    // Si no hay traducción específica, usamos la versión en inglés capitalizada
     return translations[lowerRole] || capitalize(role);
 }
 
-// Helper para poner mayúscula la primera letra (usado como fallback)
 function capitalize(s) {
     if (typeof s !== 'string') return '';
     return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-// =======================================================================
-// MODIFICACIÓN: Función actualizada para manejar Smart Links (Lazy Load)
-// =======================================================================
 function updateAlbumDetailsWithSpotifyData(d, links) {
     const el = document.getElementById('releaseDate');
     if (el) el.innerHTML = '';
@@ -1312,44 +1246,31 @@ function updateAlbumDetailsWithSpotifyData(d, links) {
         if (d.isrc && d.isrc.trim() !== '') trackIsrc.textContent = d.isrc.toUpperCase(); 
         else trackIsrc.textContent = '----';
     }
-
-    // =======================================================================
-    // ELIMINADA GESTIÓN AUTO DE ODESLI (Se maneja en fetchSongDetails y listener)
-    // =======================================================================
 }
 
-// =======================================================================
-// NUEVO: EVENTO CLICK PARA SMART LINK (Lazy Load + Rescue + TRUE LAZY LINK)
-// =======================================================================
 if (smartLinkButton) {
     smartLinkButton.addEventListener('click', async function(e) {
         e.preventDefault();
         
-        // 1. Revisar si ya tenemos el link de Odesli en caché (dataset)
         if (this.dataset.odesliLink) {
             window.open(this.dataset.odesliLink, '_blank');
             return;
         }
 
-        // 2. Si no hay link de Spotify (carga lenta), intentar RESCATARLO AHORA MISMO
         if (!currentSpotifyUrl) {
             showNotification('Buscando enlace de Spotify...');
             
             try {
-                // Intentamos buscarlo urgentemente usando lo que sale en pantalla
                 const artist = songArtist.textContent;
                 const title = songTitle.textContent;
                 const album = songAlbum.textContent.replace(/[()]/g, '').trim();
 
                 if (artist && title) {
-                    // IMPORTANTE: linksOnly=true para que el worker solo busque Odesli, no datos de Spotify (ahorra cuota de Spotify)
                     const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&album=${encodeURIComponent(album)}&linksOnly=true`;
                     const res = await fetch(u);
                     if (res.ok) {
                         const d = await res.json();
-                        // FIX: Usar debugSpotifyUrl para el rescate
                         if (d && d.debugSpotifyUrl) {
-                            // ¡Éxito! Guardamos y continuamos el flujo normal
                             currentSpotifyUrl = d.debugSpotifyUrl;
                         }
                     }
@@ -1358,22 +1279,18 @@ if (smartLinkButton) {
                 console.warn("No se pudo rescatar el link rápido", err);
             }
 
-            // Si AÚN no hay link (la API falló o no encontró nada), salimos
             if (!currentSpotifyUrl) {
                 showNotification('Aún cargando datos de la canción... Inténtalo en unos segundos');
                 return;
             }
         }
 
-        // 3. Si llegamos aquí, tenemos un link de Spotify seguro (cargado antes o rescatado ahora)
         showNotification('Buscando enlaces disponibles...');
 
         try {
-            // Usamos el mismo endpoint para intentar conseguir Odesli
-            // IMPORTANTE: Pasamos los datos actuales del DOM para asegurar coincidencia
             const artist = songArtist.textContent;
             const title = songTitle.textContent;
-            const album = songAlbum.textContent.replace(/[()]/g, '').trim(); // Limpiar paréntesis
+            const album = songAlbum.textContent.replace(/[()]/g, '').trim(); 
 
             const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&album=${encodeURIComponent(album)}&linksOnly=true`;
             
@@ -1381,9 +1298,7 @@ if (smartLinkButton) {
             if (!res.ok) throw new Error("Error fetching Odesli");
             const d = await res.json();
 
-            // IMPORTANTE: Usar debugSpotifyUrl para el rescate
             if (d && d.links && d.links.universalLink) {
-                // Éxito: Guardamos en caché del botón y navegamos
                 this.dataset.odesliLink = d.links.universalLink;
                 window.open(d.links.universalLink, '_blank');
             } else {
@@ -1391,14 +1306,12 @@ if (smartLinkButton) {
             }
         } catch (err) {
             console.warn("Error Odesli/Lazy Load, usando fallback Spotify:", err);
-            // FALLBACK: Si falla (429, red, etc.), ir directo a Spotify
             window.open(currentSpotifyUrl, '_blank');
         }
     });
 }
 
 function updateUIWithTrackInfo(t) {
-    // Solo actualizar si cambia el texto
     if (songTitle.textContent !== t.title) songTitle.textContent = t.title;
     if (songArtist.textContent !== t.artist) songArtist.textContent = t.artist;
     
@@ -1433,7 +1346,6 @@ function startCountdown() {
     if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
     if (!trackStartTime) { resetCountdown(); return; }
 
-    // Variable auxiliar para no hacer miles de llamadas en el mismo segundo
     let lastCheckedSecond = -1;
 
     if (trackDuration > 0) {
@@ -1461,7 +1373,6 @@ function startCountdown() {
         }, 10000);
     }
 
-    // --- FUNCIÓN DE ACTUALIZACIÓN DEL RELOJ (ANIDADA) ---
     function updateTimer() {
         if (!isPlaying) return; 
 
@@ -1470,11 +1381,9 @@ function startCountdown() {
         let d;
         let displayText = '';
         
-        // FIX: Evitar glitch de tiempo transcurrido al inicio
         if (trackDuration === 0) {
             if (currentStation && (currentStation.service === 'somafm' || currentStation.service === 'radioparadise')) {
                 d = 0; 
-                // No actualizar el DOM para evitar ver el conteo errático
                 animationFrameId = requestAnimationFrame(updateTimer);
                 return;
             } else {
@@ -1483,21 +1392,15 @@ function startCountdown() {
         } else {
             d = trackDuration - el;
 
-            // --- NUEVA LÓGICA: CUENTA ATRÁS O CUENTA HACIA ARRIBA (+) ---
             if (d < 0) {
-                // Hemos pasado el tiempo estimado
                 const elapsed = Math.abs(d);
                 const m = Math.floor(elapsed / 60);
                 const s = Math.floor(elapsed % 60);
                 
                 displayText = `+${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 
-                // --- MEJORA SOLICITADA: Verificación Activa ---
-                // Cada 2 segundos mientras estamos en zona positiva (+),
-                // forzamos una llamada a la API para ver si ya cambió la canción.
                 const currentElapsedSecond = Math.floor(elapsed);
                 
-                // Verificar: Solo si es la canción correcta antes de actualizar
                 if (currentElapsedSecond % 2 === 0 &&
                     currentElapsedSecond !== lastCheckedSecond &&
                     !isUpdatingSongInfo
@@ -1505,15 +1408,12 @@ function startCountdown() {
                     updateSongInfo(true);
                     lastCheckedSecond = currentElapsedSecond;
                 }
-            // --------------------------------------------------
 
         } else {
-            // Tiempo restante normal
             const m = Math.floor(d / 60);
             const s = Math.floor(d % 60);
             displayText = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
             
-            // Resetear el control de verificación al volver a tiempo positivo
             lastCheckedSecond = -1; 
 
             if (d < 10) countdownTimer.classList.add('ending'); 
@@ -1522,7 +1422,6 @@ function startCountdown() {
 
         if (displayText) countdownTimer.textContent = displayText;
 
-        // --- FIX: MANTENER EL BUCLE SIEMPRE ACTIVO MIENTRAS HAY AUDIO ---
         if (isPlaying) {
             animationFrameId = requestAnimationFrame(updateTimer);
         }
@@ -1542,13 +1441,12 @@ function resetAlbumDetails() {
     const trackCredits = document.getElementById('trackCredits');
     if (trackCredits) {
         trackCredits.textContent = '--';
-        trackCredits.title = ''; // LIMPIAR TITLE NATIVO AQUI
-        trackCredits.title = ''; // LIMPIAR TITLE NATIVO AQUI TAMBIEN
+        trackCredits.title = ''; 
+        trackCredits.title = ''; 
         trackCredits.style.borderBottom = 'none';
     }
     currentCredits = ""; 
     
-    // RESET ODESLI CACHE
     currentSpotifyUrl = ""; 
     if (smartLinkButton) {
         delete smartLinkButton.dataset.odesliLink;
@@ -1696,7 +1594,7 @@ const connectionManager = {
     maxReconnectAttempts:5,
     initialReconnectDelay: 1000,
     maxReconnectDelay: 30000,
-    reconnectTimeoutId: null, // CORREGIDO: Usar ':' en lugar de '='
+    reconnectTimeoutId: null, 
     audioCheckInterval: null,
     start() {
         if (this.isReconnecting) return;
@@ -1847,8 +1745,7 @@ if (installPwaBtnIos) {
 setTimeout(showInstallPwaButtons, 1000);
 
 if (shareButton) { 
-    // CORREGIDO: Agregada la llave de cierre } para el if (shareButton)
-    shareButton.addEventListener('click', () => { shareOptions.classList.toggle('active'); }); 
+    shareButton.addEventListener('click', () => { shareOptions.classList.toggle('active'); });
 }
 document.addEventListener('click', (e) => { if (shareButton && shareOptions && !shareButton.contains(e.target) && !shareOptions.contains(e.target)) shareOptions.classList.remove('active'); });
 
@@ -1858,7 +1755,6 @@ if (shareWhatsApp) {
         const artist = songArtist.textContent;
         if (title && artist && title !== 'a sonar' && title !== 'Conectando...' && title !== 'Seleccionar estación') {
             
-            // MODIFICACIÓN: Generar URL de estación
             const baseUrl = window.location.origin;
             const stationParam = currentStation ? `?station=${currentStation.id}` : '';
             const fullUrl = `${baseUrl}${stationParam}`;
@@ -1980,16 +1876,10 @@ if ('serviceWorker' in navigator) {
                     if (un) un.style.display = 'block'; 
                 }
                 
-                // =================================================================
-                // FORZAR ACTUALIZACIÓN SIEMPRE (Windows, Android, iOS)
-                // =================================================================
                 reg.addEventListener('updatefound', () => {
                     const nw = reg.installing;
                     nw?.addEventListener('statechange', () => {
                         if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-                            // Opcional: Mostrar notificación visual brevemente
-                            // if (un) un.style.display = 'block';
-                            // FORZAR: Enviar mensaje para activar el nuevo SW inmediatamente
                             nw.postMessage({ type: 'SKIP_WAITING' });
                         }
                     });
@@ -1997,7 +1887,6 @@ if ('serviceWorker' in navigator) {
             })
             .catch(e => console.error('SW error:', e));
         
-        // Cuando el SW cambia, recargar la página automáticamente
         navigator.serviceWorker.addEventListener('controllerchange', () => { 
             if (!refreshing) { 
                 refreshing = true; 
@@ -2022,18 +1911,15 @@ const trackCredits = document.getElementById('trackCredits');
 const tooltipEl = document.getElementById('tooltip-credits');
 
 if (trackCredits && tooltipEl) {
-    // Función para mostrar el tooltip
     const showTooltip = () => {
         if (!currentCredits) return;
-        updateTooltipPosition(); // Recalcular posición al mostrar
+        updateTooltipPosition(); 
         tooltipEl.style.opacity = '1';
         tooltipEl.style.visibility = 'visible';
     };
 
-    // Función para ocultar el tooltip
     const hideTooltip = () => {
         tooltipEl.style.opacity = '0';
-        // Timeout para ocultar visibility después de la transición de opacidad
         setTimeout(() => {
             if (tooltipEl.style.opacity === '0') {
                 tooltipEl.style.visibility = 'hidden';
@@ -2041,11 +1927,8 @@ if (trackCredits && tooltipEl) {
         }, 200); 
     };
 
-    // Eventos de Mouse
     trackCredits.addEventListener('mouseenter', showTooltip);
     trackCredits.addEventListener('mouseleave', hideTooltip);
-
-    // Eventos de Accesibilidad (Teclado)
     trackCredits.addEventListener('focus', showTooltip);
     trackCredits.addEventListener('blur', hideTooltip);
 }
