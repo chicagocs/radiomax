@@ -720,6 +720,7 @@ if (smartLinkButton) {
                     currentSmartLink = data.universalLink;
                     window.open(currentSmartLink, '_blank');
                 } else {
+                    console.error("Error Odesli:", data.error);
                     showNotification("No se encontraron enlaces de streaming");
                 }
             } catch (err) {
