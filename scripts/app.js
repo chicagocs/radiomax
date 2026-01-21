@@ -951,7 +951,6 @@ async function fetchSongDetails(artist, title, album, fetchId, fetchLinksActive 
     let spotifyCleanTitle = '';
 
     try {
-        // SAFE CONCATENATION: Using + instead of ``
         const u = 'https://core.chcs.workers.dev/spotify?artist=' + encodeURIComponent(sA) + '&title=' + encodeURIComponent(sT) + '&album=' + encodeURIComponent(sAl) + '&linksOnly=' + fetchLinksActive;
         const res = await fetch(u);
         if (!res.ok) throw new Error("HTTP error! status: " + res.status);
@@ -1026,7 +1025,6 @@ function formatCreditsList(relations) {
 
     const sortedRoles = Object.keys(roleMap).sort((a, b) => a.localeCompare(b, 'es'));
 
-    // SAFE CONCATENATION
     return sortedRoles.map(role => {
         const names = roleMap[role].join(', ');
         return '<div><b>' + role + '</b> ' + names + '</div>';
@@ -1101,7 +1099,6 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
         const searchTitle = spotifyTitle ? spotifyTitle : title;
 
         const cleanTitle = searchTitle.replace(/\([^)]*\)/g, '').trim();
-        // SAFE CONCATENATION
         const searchUrl = 'https://musicbrainz.org/ws/2/recording/?query=artist:"' + encodeURIComponent(searchArtist) + '" AND recording:"' + encodeURIComponent(cleanTitle) + '"&fmt=json&limit=5';
         
         const res = await fetch(searchUrl, { headers: { 'User-Agent': 'RadioStreamingPlayer/1.0 (https://radiomax.tramax.com.ar)' } });
@@ -1269,7 +1266,6 @@ if (smartLinkButton) {
                 const album = songAlbum.textContent.replace(/[()]/g, '').trim();
 
                 if (artist && title) {
-                    // SAFE CONCATENATION
                     const u = 'https://core.chcs.workers.dev/spotify?artist=' + encodeURIComponent(artist) + '&title=' + encodeURIComponent(title) + '&album=' + encodeURIComponent(album) + '&linksOnly=true';
                     const res = await fetch(u);
                     if (res.ok) {
@@ -1296,7 +1292,6 @@ if (smartLinkButton) {
             const title = songTitle.textContent;
             const album = songAlbum.textContent.replace(/[()]/g, '').trim(); 
 
-            // SAFE CONCATENATION
             const u = 'https://core.chcs.workers.dev/spotify?artist=' + encodeURIComponent(artist) + '&title=' + encodeURIComponent(title) + '&album=' + encodeURIComponent(album) + '&linksOnly=true';
             
             const res = await fetch(u);
@@ -1402,7 +1397,6 @@ function startCountdown() {
                 const m = Math.floor(elapsed / 60);
                 const s = Math.floor(elapsed % 60);
                 
-                // SAFE CONCATENATION
                 displayText = '+' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
 
                 const currentElapsedSecond = Math.floor(elapsed);
@@ -1418,7 +1412,6 @@ function startCountdown() {
         } else {
             const m = Math.floor(d / 60);
             const s = Math.floor(d % 60);
-            // SAFE CONCATENATION
             displayText = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
             
             lastCheckedSecond = -1; 
@@ -1766,24 +1759,39 @@ if (shareWhatsApp) {
             const stationParam = currentStation ? '?station=' + currentStation.id : '';
             const fullUrl = baseUrl + stationParam;
 
-            // SAFE CONCATENATION
-            const m = 'Escuché ' + title + ' de ' + artist + ' en ' + fullUrl + ' ¡Temazo en RadioMax!';
+            const part1 = 'Escuché ';
+            const part2 = ' de ';
+            const part3 = ' en ';
+            const part4 = ' ¡Temazo en RadioMax!';
+            const m = part1 + title + part2 + artist + part3 + fullUrl + part4;
+
             const isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
             if (isBrave) {
                 showNotification('En Brave, toca el enlace para abrir WhatsApp Web');
-                // SAFE CONCATENATION
-                setTimeout(() => { window.open('https://wa.me/?text=' + encodeURIComponent(m), '_blank'); }, 1000);
+                setTimeout(() => {
+                    const url = 'https://wa.me/?text=' + encodeURIComponent(m);
+                    window.open(url, '_blank');
+                }, 1000);
             } else if (isMob) {
-                // SAFE CONCATENATION
-                const uri = 'whatsapp://send?text=' + encodeURIComponent(m);
+                const url = 'whatsapp://send?text=' + encodeURIComponent(m);
                 const link = document.createElement('a');
-                link.href = uri; link.target = '_blank'; link.rel = 'noopener noreferrer';
-                document.body.appendChild(link); link.click(); document.body.removeChild(link);
-                // SAFE CONCATENATION
-                setTimeout(() => { window.open('https://wa.me/?text=' + encodeURIComponent(m), '_blank'); }, 1500);
-            // SAFE CONCATENATION
-            } else window.open('https://wa.me/?text=' + encodeURIComponent(m), '_blank');
+                link.href = url; 
+                link.target = '_blank'; 
+                link.rel = 'noopener noreferrer';
+                document.body.appendChild(link); 
+                link.click(); 
+                document.body.removeChild(link);
+                
+                setTimeout(() => {
+                    const url2 = 'https://wa.me/?text=' + encodeURIComponent(m);
+                    window.open(url2, '_blank');
+                }, 1500);
+            } else {
+                const url = 'https://wa.me/?text=' + encodeURIComponent(m);
+                window.open(url, '_blank');
+            }
+            
             if (shareOptions) shareOptions.classList.remove('active');
         } else showNotification('Por favor, espera a que comience una canción para compartir');
     });
