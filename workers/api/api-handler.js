@@ -157,40 +157,70 @@ async function handleSpotifyRequest(request, env, ctx) {
   }
 }
 
-// --- ODESLI PROXY (RUTA CRÍTICA) ---
+// --- ODESLI PROXY (RUTA CRÍTICA MEJORADA) ---
 async function handleOdesliProxyRequest(request) {
   console.log("HANDLER: Llamada recibida en /odesli");
   try {
     const url = new URL(request.url);
     const spotifyUrl = url.searchParams.get("url");
 
-    if (!spotifyUrl || spotifyUrl === "NO_URL") {
-      return new Response(JSON.stringify({ error: "URL de Spotify inválida" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    // Validación estricta de la URL de entrada
+    if (!spotifyUrl || spotifyUrl === "NO_URL" || spotifyUrl.trim() === "") {
+      console.warn("HANDLER: URL inválida recibida:", spotifyUrl);
+      return new Response(JSON.stringify({ error: "URL de Spotify inválida o vacía", debugInput: spotifyUrl }), { 
+        status: 400, 
+        headers: { "Content-Type": "application/json" } 
+      });
     }
 
     console.log("HANDLER: Consultando Odesli con URL: ", spotifyUrl);
+    
+    // Nota: userCountry=AR puede afectar la disponibilidad. Puedes cambiarlo a 'US' si sigue fallando.
     const apiUrl = `https://api.song.link/v1-alpha.1/links?url=${encodeURIComponent(spotifyUrl)}&userCountry=AR`;
-    const headers = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' };
+    
+    // Cabeceras robustas para evitar bloqueos o respuestas en HTML
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'application/json', // CRÍTICO: Forzar respuesta JSON
+      'Accept-Language': 'en-US,en;q=0.9',
+    };
 
     const response = await fetch(apiUrl, { headers });
 
     if (!response.ok) {
-        console.log("HANDLER: Error Odesli ", response.status);
-        return new Response(JSON.stringify({ error: `Error Odesli: ${response.status}` }), { status: response.status, headers: { "Content-Type": "application/json" } });
+        console.log("HANDLER: Error HTTP Odesli ", response.status);
+        // Si Odesli devuelve 404, pasamos el mensaje claro
+        if (response.status === 404) {
+             return new Response(JSON.stringify({ error: "Canción no encontrada en Odesli (404)" }), { status: 404, headers: { "Content-Type": "application/json" } });
+        }
+        // Si es un error 5xx u otro, lo pasamos tal cual
+        const errorText = await response.text();
+        return new Response(JSON.stringify({ error: `Error Odesli: ${response.status}`, details: errorText }), { status: response.status, headers: { "Content-Type": "application/json" } });
     }
 
     const data = await response.json();
-    console.log("HANDLER: Odesli OK, link: ", data.pageUrl);
+    console.log("HANDLER: Odesli Response Keys:", Object.keys(data));
+    console.log("HANDLER: PageUrl encontrada:", data.pageUrl);
 
+    // Prioridad 1: Usar el pageUrl universal de song.link
     if (data && data.pageUrl) {
         return new Response(JSON.stringify({ universalLink: data.pageUrl }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
-    return new Response(JSON.stringify({ error: "No se encontraron enlaces" }), { status: 404, headers: { "Content-Type": "application/json" } });
+    // Prioridad 2: Si no hay pageUrl universal, intentar buscar el enlace directo de Spotify
+    // Esto sucede a veces con ciertas configuraciones regionales
+    if (data && data.linksByPlatform && data.linksByPlatform.spotify) {
+        console.log("HANDLER: Fallback a enlace directo de Spotify");
+        return new Response(JSON.stringify({ universalLink: data.linksByPlatform.spotify.url }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+
+    // Si nada funciona, devolvemos error 404 con información de depuración
+    console.error("HANDLER: Estructura de respuesta inesperada:", JSON.stringify(data));
+    return new Response(JSON.stringify({ error: "No se encontraron enlaces (Estructura inválida)", debugData: data }), { status: 404, headers: { "Content-Type": "application/json" } });
 
   } catch (e) {
-    console.log("HANDLER: Excepcion ", e);
-    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+    console.error("HANDLER: Excepción capturada:", e);
+    return new Response(JSON.stringify({ error: e.message, stack: e.stack }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 }
 
