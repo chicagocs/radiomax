@@ -75,7 +75,6 @@ async function addAssetIgnoringHeaders(cache, url) {
 
     // 6. Guardamos en caché
     await cache.put(url, newResponse);
-    console.log(`[SW] Force cached: ${url}`);
 
   } catch (err) {
     console.error(`[SW] Failed to force cache ${url}:`, err);
