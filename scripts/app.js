@@ -1,4 +1,4 @@
-// app.js - v4.2 (Client-side Odesli + Lazy Load)
+// app.js - v4.3 (Client-side Odesli & MusicBrainz headers fix)
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm';
 
@@ -881,17 +881,18 @@ function startRadioParadisePolling() {
 }
 
 // =======================================================================
-// NUEVO: FUNCIÓN CLIENT-SIDE PARA ODESLI
+// NUEVO: FUNCIÓN CLIENT-SIDE PARA ODESLI (FIX: Forbidden Headers Removed)
 // =======================================================================
 async function getOdesliLinksClientSide(spotifyUrl) {
     if (!spotifyUrl || spotifyUrl === "NO_URL") return null;
     
     try {
         const apiUrl = `https://api.song.link/v1-alpha.1/links?url=${encodeURIComponent(spotifyUrl)}&userCountry=AR`;
+        
+        // FIX CRÍTICO: Eliminados los headers. Los navegadores no permiten modificar User-Agent.
         const res = await fetch(apiUrl);
         
         if (!res.ok) {
-            // Si falla (ej 429), simplemente devolvemos null y el botón no se muestra
             console.warn(`Odesli client-side falló: ${res.status}`);
             return null;
         }
@@ -932,11 +933,7 @@ async function fetchSongDetails(artist, title, album, fetchId) {
         
         if (d) {
             spotifyUrl = d.debugSpotifyUrl || "";
-            
-            // 1. Mostrar datos de Spotify inmediatamente
             if (d.imageUrl) displayAlbumCoverFromUrl(d.imageUrl);
-            
-            // 2. Actualizar UI (sin enlaces por ahora)
             updateAlbumDetailsWithSpotifyData(d, null);
 
             if (d.duration) {
@@ -950,15 +947,11 @@ async function fetchSongDetails(artist, title, album, fetchId) {
             if (d.title) spotifyCleanTitle = d.title;
         }
 
-        // 3. Llamada asíncrona a MusicBrainz (no bloquea)
         getMusicBrainzDuration(sA, sT, sAl, spotifyIsrc, fetchId, spotifyCleanArtist, spotifyCleanTitle);
         
-        // 4. Llamada asíncrona a Odesli (Client-Side) - NO BLOQUEA
         if (spotifyUrl) {
-            // No esperamos esto con await para que la UI cargue rápido
             getOdesliLinksClientSide(spotifyUrl)
                 .then((links) => {
-                    // Verificar de nuevo por Race Condition
                     if (links && fetchId === currentSongFetchId) {
                         updateAlbumDetailsWithSpotifyData(d, links);
                     }
@@ -993,7 +986,7 @@ function formatCreditsList(relations) {
 }
     
 // ==========================================================================
-// FUNCIÓN: getMusicBrainzDuration
+// FUNCIÓN: getMusicBrainzDuration (FIX: Forbidden Headers Removed)
 // ==========================================================================
 async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId, spotifyArtist = '', spotifyTitle = '') {
     if (fetchId !== currentSongFetchId) return;
@@ -1003,7 +996,10 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
         if (isrc) {
             try {
                 const isrcUrl = `https://musicbrainz.org/ws/2/isrc/${isrc}?inc=artist-rels&fmt=json`;
-                const res = await fetch(isrcUrl, { headers: { 'User-Agent': 'RadioStreamingPlayer/1.0 (https://radiomax.tramax.com.ar)' } });
+                
+                // FIX: Eliminados headers para evitar TypeError: Failed to fetch en navegadores
+                const res = await fetch(isrcUrl);
+                
                 if (res.ok) {
                     const data = await res.json();
                     if (data.recordings && data.recordings.length > 0) {
@@ -1044,7 +1040,9 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
         const cleanTitle = searchTitle.replace(/\([^)]*\)/g, '').trim();
         const searchUrl = `https://musicbrainz.org/ws/2/recording/?query=artist:"${encodeURIComponent(searchArtist)}" AND recording:"${encodeURIComponent(cleanTitle)}"&fmt=json&limit=5`;
         
-        const res = await fetch(searchUrl, { headers: { 'User-Agent': 'RadioStreamingPlayer/1.0 (https://radiomax.tramax.com.ar)' } });
+        // FIX: Eliminados headers
+        const res = await fetch(searchUrl);
+        
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const d = await res.json();
         
@@ -1066,7 +1064,10 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
                 await new Promise(resolve => setTimeout(resolve, 1100)); 
                 if (fetchId !== currentSongFetchId) return;
                 const creditsUrl = `https://musicbrainz.org/ws/2/recording/${recordingId}?inc=artist-rels&fmt=json`;
-                const creditsRes = await fetch(creditsUrl, { headers: { 'User-Agent': 'RadioStreamingPlayer/1.0 (https://radiomax.tramax.com.ar)' } });
+                
+                // FIX: Eliminados headers
+                const creditsRes = await fetch(creditsUrl);
+                
                 if (creditsRes.ok) {
                     const creditsData = await creditsRes.json();
                     const creditsElement = document.getElementById('trackCredits');
@@ -1156,16 +1157,11 @@ function updateAlbumDetailsWithSpotifyData(d, links) {
     // GESTIÓN DE ENLACES ODESLI (SMART LINK - LAZY LOAD)
     // =======================================================================
     if (smartLinkButton) {
-        // Si 'links' tiene datos (vino de Odesli), mostramos el botón
         if (links && links.universalLink) {
             smartLinkButton.href = links.universalLink;
             smartLinkButton.classList.add('visible');
             smartLinkButton.setAttribute('aria-label', 'Escuchar en Spotify, Apple Music u otras plataformas');
         } else {
-            // Si no hay links, ocultamos el botón.
-            // Nota: Esta función se llama dos veces:
-            // 1. Con links=null (carga inicial Spotify) -> Botón oculto
-            // 2. Con links=data (carga final Odesli) -> Botón visible
             smartLinkButton.classList.remove('visible');
         }
     }
