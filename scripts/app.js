@@ -1150,6 +1150,7 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
         if (recordingId) {
             try {
                 await new Promise(resolve => setTimeout(resolve, 1100)); 
+                if (fetchId !== currentSongFetchId) return;
                 const creditsUrl = `https://musicbrainz.org/ws/2/recording/${recordingId}?inc=artist-rels&fmt=json`;
                 const creditsRes = await fetch(creditsUrl, { headers: { 'User-Agent': 'RadioStreamingPlayer/1.0 (https://radiomax.tramax.com.ar)' } });
                 
