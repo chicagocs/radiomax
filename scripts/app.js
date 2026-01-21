@@ -91,7 +91,7 @@ const RAPID_CHECK_THRESHOLD = 150;
 audioPlayer.volume = 0.5;
 
 // ==========================================================================
-// FUNCIONES: SUPABASE PRESENCE (CONTADOR DE OYENTES)
+// FUNCIONES: SUPABASE PRESENCIA (CONTADOR DE OYENTES)
 // ==========================================================================
 function getUserUniqueID() {
     let uid = localStorage.getItem('rm_uid');
@@ -168,7 +168,7 @@ async function leaveStation(stationId) {
     }
 
     if (currentChannel) {
-        // FIX: Try-catch para evitar errores en consola al desconectar canales durante cambios rápidos
+        // FIX: Try-catch para evitar errores en consola al desconectar canales durante cambios rápidos de estación
         try {
             await supabase.removeChannel(currentChannel);
         } catch (err) {
@@ -645,7 +645,7 @@ function resetAlbumCover() {
                     <circle cx="320" cy="320" r="160" />
                 </g>
                 <g transform="translate(320, 320)">
-                    <path d="M -90 -80 L -90 80 C -90 80, -60 100, -30 80 L 30 0 L 90 80 M 90 -80 L 90 80" stroke="#FF7A00" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none" filter="url(#glow)" />
+                    <path d="M -90 -80 L -90 80 C -90 80, -60 100, -30 80 L 30 0 L 90 80 M 90 80 M 90 -80 L 90 80" stroke="#FF7A00" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none" filter="url(#glow)" />
                 </g>
             </svg>
         </div>
@@ -847,7 +847,7 @@ async function playStation() {
             updateSongInfo(true);
             startRadioParadisePolling();
         } else {
-            setTimeout(() => startSongInfoUpdates(), 5000);
+            setTimeout(() => startSongInfoUpdates(),5000);
         }
         if (installInvitationTimeout === null) setTimeout(showInstallInvitation, 600000);
         setTimeout(() => { if (isPlaying) startPlaybackChecks(); }, 2000);
@@ -982,7 +982,7 @@ async function fetchSongDetails(artist, title, album, fetchId, fetchLinksActive 
     let spotifyCleanTitle = '';
 
     try {
-        // NUEVO: linksOnly controla si el Worker debe buscar Odesli
+        // NUEVO: PASAMOS linksOnly = false para evitar gastar cuota en segundo plano
         const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(sA)}&title=${encodeURIComponent(sT)}&album=${encodeURIComponent(sAl)}&linksOnly=${fetchLinksActive}`;
         const res = await fetch(u);
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
@@ -1035,6 +1035,8 @@ async function fetchSongDetails(artist, title, album, fetchId, fetchLinksActive 
             if (smartLinkButton) {
                 smartLinkButton.classList.add('visible');
             }
+        } else if (smartLinkButton) {
+            smartLinkButton.classList.remove('visible');
         }
         
         // Llamamos a MusicBrainz pasando los datos de Spotify para el rescate
@@ -1121,8 +1123,8 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
                                 const tooltipContent = document.getElementById('tooltip-credits-content');
                                 if (tooltipContent) {
                                     // FIX JS: Forzar estilos para asegurar visualización correcta
-                                    tooltipContent.innerHTML = creditHtml;
                                     // FIX: REMOVER whiteSpace = 'normal' para permitir que CSS pre-wrap funcione
+                                    tooltipContent.innerHTML = creditHtml;
                                 }
                             } else {
                                 if (fetchId !== currentSongFetchId) return;
@@ -1136,7 +1138,7 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
                                 
                                 const tooltipContent = document.getElementById('tooltip-credits-content');
                                 if (tooltipContent) {
-                                    tooltipContent.innerHTML = '';
+                                    tooltipContent.textContent = '';
                                 }
                             }
                         }
@@ -1196,12 +1198,13 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
                         if (creditHtml) {
                             currentCredits = creditHtml;
                             creditsElement.textContent = 'Ver detalles';
-                            creditsElement.title = creditHtml.replace(/<[^>]*>?/gm, '');
-                            
+                            creditsElement.title = creditHtml.replace(/<[^>]*>?/gm, ''); 
+                                
                             const tooltipContent = document.getElementById('tooltip-credits-content');
                             if (tooltipContent) {
                                 // FIX JS: Forzar estilos (y quitar whiteSpace override)
                                 tooltipContent.innerHTML = creditHtml;
+                                // FIX: REMOVER whiteSpace = 'normal' para permitir que CSS pre-wrap funcione
                             }
                         } else {
                             if (fetchId !== currentSongFetchId) return;
@@ -1210,12 +1213,12 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
                             creditsElement.textContent = 'S/D';
                             creditsElement.title = ''; // LIMPIAR TITLE NATIVO AQUI
                             creditsElement.style.borderBottom = 'none';
-
+                            
                             currentCredits = "";
 
                             const tooltipContent = document.getElementById('tooltip-credits-content');
                             if (tooltipContent) {
-                                tooltipContent.innerHTML = '';
+                                tooltipContent.textContent = '';
                             }
                         }
                     }
@@ -1276,7 +1279,7 @@ function capitalize(s) {
     if (typeof s !== 'string') return '';
     return s.charAt(0).toUpperCase() + s.slice(1);
 }
-    
+
 // =======================================================================
 // MODIFICACIÓN: Función actualizada para manejar Smart Links (Lazy Load)
 // =======================================================================
@@ -1284,7 +1287,7 @@ function updateAlbumDetailsWithSpotifyData(d, links) {
     const el = document.getElementById('releaseDate');
     if (el) el.innerHTML = '';
     if (d.release_date) {
-        const y = d.release_date.substring(0,4);
+        const y = d.release_date.substring(0, 4);
         let t = y;
         if (d.albumTypeDescription && d.albumTypeDescription !== 'Álbum') t += ` (${d.albumTypeDescription})`;
         el.textContent = t;
@@ -1314,10 +1317,9 @@ function updateAlbumDetailsWithSpotifyData(d, links) {
     // ELIMINADA GESTIÓN AUTO DE ODESLI (Se maneja en fetchSongDetails y listener)
     // =======================================================================
 }
-// =======================================================================
 
 // =======================================================================
-// NUEVO: EVENTO CLICK PARA SMART LINK (Lazy Load + Rescue + TRUE Lazy Load)
+// NUEVO: EVENTO CLICK PARA SMART LINK (Lazy Load + Rescue + TRUE LAZY LINK)
 // =======================================================================
 if (smartLinkButton) {
     smartLinkButton.addEventListener('click', async function(e) {
@@ -1335,16 +1337,17 @@ if (smartLinkButton) {
             
             try {
                 // Intentamos buscarlo urgentemente usando lo que sale en pantalla
-                // IMPORTANTE: linksOnly=false para no gastar cuota
                 const artist = songArtist.textContent;
                 const title = songTitle.textContent;
-                const album = songAlbum.textContent;
+                const album = songAlbum.textContent.replace(/[()]/g, '').trim();
 
                 if (artist && title) {
-                    const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&album=${encodeURIComponent(album)}&linksOnly=false`;
+                    // IMPORTANTE: linksOnly=true para que el worker solo busque Odesli, no datos de Spotify (ahorra cuota de Spotify)
+                    const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&album=${encodeURIComponent(album)}&linksOnly=true`;
                     const res = await fetch(u);
                     if (res.ok) {
                         const d = await res.json();
+                        // FIX: Usar debugSpotifyUrl para el rescate
                         if (d && d.debugSpotifyUrl) {
                             // ¡Éxito! Guardamos y continuamos el flujo normal
                             currentSpotifyUrl = d.debugSpotifyUrl;
@@ -1362,14 +1365,15 @@ if (smartLinkButton) {
             }
         }
 
-        // 3. Tenemos link seguro, intentar conseguir Smart Link de Odesli AHORA MISMO
-        // IMPORTANTE: linksOnly=true para activar la búsqueda en el Worker
+        // 3. Si llegamos aquí, tenemos un link de Spotify seguro (cargado antes o rescatado ahora)
         showNotification('Buscando enlaces disponibles...');
 
         try {
+            // Usamos el mismo endpoint para intentar conseguir Odesli
+            // IMPORTANTE: Pasamos los datos actuales del DOM para asegurar coincidencia
             const artist = songArtist.textContent;
             const title = songTitle.textContent;
-            const album = songAlbum.textContent.replace(/[()]/g, ''); // Limpiar paréntesis
+            const album = songAlbum.textContent.replace(/[()]/g, '').trim(); // Limpiar paréntesis
 
             const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&album=${encodeURIComponent(album)}&linksOnly=true`;
             
@@ -1377,6 +1381,7 @@ if (smartLinkButton) {
             if (!res.ok) throw new Error("Error fetching Odesli");
             const d = await res.json();
 
+            // IMPORTANTE: Usar debugSpotifyUrl para el rescate
             if (d && d.links && d.links.universalLink) {
                 // Éxito: Guardamos en caché del botón y navegamos
                 this.dataset.odesliLink = d.links.universalLink;
@@ -1402,7 +1407,7 @@ function updateUIWithTrackInfo(t) {
     
     updateShareButtonVisibility();
 }
-    
+
 function resetUI() {
     if (connectionManager.isReconnecting) return;
     songTitle.textContent = 'Reproduciendo...';
@@ -1442,8 +1447,9 @@ function startCountdown() {
             const el = (Date.now() - trackStartTime) / 1000;
             if (el > RAPID_CHECK_THRESHOLD && !rapidCheckInterval) {
                 rapidCheckInterval = setInterval(() => {
-                    if (currentStation?.service === 'somafm') updateSongInfo(true);
-                    else { if (rapidCheckInterval) { clearInterval(rapidCheckInterval); rapidCheckInterval = null; } }
+                    if (currentStation?.service === 'somafm') {
+                        if (currentStation?.service === 'somafm') updateSongInfo(true);
+                        else { if (rapidCheckInterval) { clearInterval(rapidCheckInterval); rapidCheckInterval = null; } }
                 }, 2000); 
             }
         };
@@ -1475,30 +1481,29 @@ function startCountdown() {
             }
         } else {
             d = trackDuration - el;
-        }
 
-        // --- NUEVA LÓGICA: CUENTA ATRÁS O CUENTA HACIA ARRIBA (+) ---
-        if (d < 0) {
-            // Hemos pasado el tiempo estimado
-            const elapsed = Math.abs(d);
-            const m = Math.floor(elapsed / 60);
-            const s = Math.floor(elapsed % 60);
-            
-            displayText = `+${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            // --- NUEVA LÓGICA: CUENTA ATRÁS O CUENTA HACIA ARRIBA (+) ---
+            if (d < 0) {
+                // Hemos pasado el tiempo estimado
+                const elapsed = Math.abs(d);
+                const m = Math.floor(elapsed / 60);
+                const s = Math.floor(elapsed % 60);
+                
+                displayText = `+${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 
-            // --- MEJORA SOLICITADA: Verificación Activa ---
-            // Cada 2 segundos mientras estamos en zona positiva (+),
-            // forzamos una llamada a la API para ver si ya cambió la canción.
-            const currentElapsedSecond = Math.floor(elapsed);
-            
-            if (
-                currentElapsedSecond % 2 === 0 &&
-                currentElapsedSecond !== lastCheckedSecond &&
-                !isUpdatingSongInfo
-            ) {
-                updateSongInfo(true);
-                lastCheckedSecond = currentElapsedSecond;
-            }
+                // --- MEJORA SOLICITADA: Verificación Activa ---
+                // Cada 2 segundos mientras estamos en zona positiva (+),
+                // forzamos una llamada a la API para ver si ya cambió la canción.
+                const currentElapsedSecond = Math.floor(elapsed);
+                
+                // Verificar: Solo si es la canción correcta antes de actualizar
+                if (currentElapsedSecond % 2 === 0 &&
+                    currentElapsedSecond !== lastCheckedSecond &&
+                    !isUpdatingSongInfo
+                ) {
+                    updateSongInfo(true);
+                    lastCheckedSecond = currentElapsedSecond;
+                }
             // --------------------------------------------------
 
         } else {
@@ -1536,7 +1541,8 @@ function resetAlbumDetails() {
     const trackCredits = document.getElementById('trackCredits');
     if (trackCredits) {
         trackCredits.textContent = '--';
-        trackCredits.title = ''; // LIMPIAR TITLE AQUI TAMBIEN
+        trackCredits.title = ''; // LIMPIAR TITLE NATIVO AQUI
+        trackCredits.title = ''; // LIMPIAR TITLE NATIVO AQUI TAMBIEN
         trackCredits.style.borderBottom = 'none';
     }
     currentCredits = ""; 
@@ -1588,7 +1594,7 @@ if (audioPlayer) {
         const err = audioPlayer.error;
         if (err) {
             if (err.code == 1 || err.code == 4) { return; }
-            logErrorForAnalysis('Audio error', { code: err.code, msg: err.message, station: currentStation ? currentStation.id : 'unknown', timestamp: new Date().toISOString() });
+            logErrorForAnalysis('Audio error', { code: err.code, msg: err.message, station: currentStation ? currentStation.id : 'unknown', timestamp: new Date().toISOString(), userAgent: navigator.userAgent });
             if (err.message.includes('interrupt') || err.message.includes('aborted')) {
                 wasPlayingBeforeFocusLoss = true;
                 setTimeout(() => {
@@ -1642,6 +1648,8 @@ if (volumeSlider) {
         updateVolumeIconPosition();
         if (this.value == 0) { volumeIcon.classList.add('muted'); isMuted = true; }
         else { volumeIcon.classList.remove('muted'); isMuted = false; previousVolume = this.value; }
+        else { volumeIcon.classList.remove('muted'); isMuted = false; previousVolume = this.value; }
+        updateVolumeIconPosition();
     });
 }
 
@@ -1673,8 +1681,8 @@ if (audioPlayer) {
             showNotification('Conexión restaurada con éxito.');
             if (currentStation && currentStation.service !== 'nrk') {
                 if (currentStation.service === 'somafm') startSomaFmPolling();
-                else if (currentStation.service === 'radioparadise') startRadioParadisePolling();
-                else startSongInfoUpdates();
+                else if (currentStation === 'radioparadise') startRadioParadisePolling();
+                else if (currentStation.service === 'nrk') startSongInfoUpdates();
                 updateSongInfo(true);
             }
         }
@@ -1688,7 +1696,7 @@ const connectionManager = {
     maxReconnectAttempts:5,
     initialReconnectDelay: 1000,
     maxReconnectDelay: 30000,
-    reconnectTimeoutId: null,
+    reconnectTimeoutId = null,
     audioCheckInterval: null,
     start() {
         if (this.isReconnecting) return;
@@ -1712,7 +1720,7 @@ const connectionManager = {
                 if (currentStation && currentStation.service !== 'nrk') {
                     if (currentStation.service === 'somafm') startSomaFmPolling();
                     else if (currentStation.service === 'radioparadise') startRadioParadisePolling();
-                    else startSongInfoUpdates();
+                    else if (currentStation.service === 'nrk') startSongInfoUpdates();
                     updateSongInfo(true);
                 }
             }
@@ -1736,10 +1744,10 @@ const connectionManager = {
                 showPlaybackInfo();
                 this.stop();
                 showNotification('Conexión restaurada con éxito.');
-                if (currentStation.service !== 'nrk') {
+                if (currentStation && currentStation.service !== 'nrk') {
                     if (currentStation.service === 'somafm') startSomaFmPolling();
                     else if (currentStation.service === 'radioparadise') startRadioParadisePolling();
-                    else startSongInfoUpdates();
+                    else { startSongInfoUpdates(); }
                     updateSongInfo(true);
                 }
             } catch (e) { this.attemptReconnect(); }
@@ -1787,7 +1795,10 @@ window.addEventListener('focus', () => {
         setTimeout(() => {
             facebookVideoDetected = false;
             if (pageFocusCheckInterval) { clearInterval(pageFocusCheckInterval); pageFocusCheckInterval = null; }
-        }, 30000);
+            setTimeout(() => {
+                facebookVideoDetected = false;
+                if (pageFocusCheckInterval) { clearInterval(pageFocusCheckInterval); pageFocusCheckInterval = null; }
+            }, 30000);
     }
 });
 
@@ -1834,7 +1845,7 @@ if (installPwaBtnIos) {
 }
 setTimeout(showInstallPwaButtons, 1000);
 
-if (shareButton) { shareButton.addEventListener('click', () => { shareOptions.classList.toggle('active'); }); }
+if (shareButton) { shareButton.addEventListener('click', () => { shareOptions.classList.toggle('active'); });
 document.addEventListener('click', (e) => { if (shareButton && shareOptions && !shareButton.contains(e.target) && !shareOptions.contains(e.target)) shareOptions.classList.remove('active'); });
 
 if (shareWhatsApp) {
@@ -1855,12 +1866,12 @@ if (shareWhatsApp) {
                 showNotification('En Brave, toca el enlace para abrir WhatsApp Web');
                 setTimeout(() => { window.open(`https://wa.me/?text=${encodeURIComponent(m)`, '_blank'); }, 1000);
             } else if (isMob) {
-                const uri = `whatsapp://send?text=${encodeURIComponent(m)}`; // Corrección typo protocolo
+                const uri = `whatsapp://send?text=${encodeURIComponent(m)}`;
                 const link = document.createElement('a');
                 link.href = uri; link.target = '_blank'; link.rel = 'noopener noreferrer';
                 document.body.appendChild(link); link.click(); document.body.removeChild(link);
                 setTimeout(() => { window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank'); }, 1500);
-            } else window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank');
+            } else window.open(`https://wa.me/?text=${encodeURIComponent(m)`, '_blank');
             if (shareOptions) shareOptions.classList.remove('active');
         } else showNotification('Por favor, espera a que comience una canción para compartir');
     });
@@ -1917,7 +1928,7 @@ document.addEventListener('keydown', function(event) {
             if (name.startsWith(key)) matches.push(opt);
         });
         if (matches.length > 0) {
-            if (key === lastKeyPressed) { lastMatchIndex = (lastMatchIndex +1) % matches.length; }
+            if (key === lastKeyPressed) { lastMatchIndex = (lastMatchIndex +1) % matches.length); }
             else { lastMatchIndex = 0; lastKeyPressed = key; }
             const opt = matches[lastMatchIndex];
             const id = opt.dataset.value;
@@ -1930,7 +1941,7 @@ document.addEventListener('keydown', function(event) {
             const trig = custom.querySelector('.custom-select-trigger');
             const st = stationsById[id];
             let txt = st.name;
-            if (st.service === 'radioparadise') txt = st.name.split(' - ')[1] || st.name;
+            if (st.service === 'radioparadise') txt = st.name.split(' - ')[1] || st.name : st.name;
             trig.textContent = txt;
             custom.querySelectorAll('.custom-option').forEach(o => o.classList.remove('selected'));
             opt.classList.add('selected');
@@ -1951,6 +1962,7 @@ if (versionSpan) {
             else { versionSpan.textContent = 'N/D'; console.warn('No version match in sw.js'); }
         })
         .catch(e => { console.error('Error loading sw version:', e); versionSpan.textContent = 'Error'; });
+    }
 }
 
 if ('serviceWorker' in navigator) {
@@ -1960,7 +1972,6 @@ if ('serviceWorker' in navigator) {
         const btn = document.getElementById('update-reload-btn');
         navigator.serviceWorker.register('/sw.js')
             .then(reg => {
-                // Verificar si hay un SW esperando al cargar
                 if (reg.waiting) { 
                     reg.waiting.postMessage({ type: 'SKIP_WAITING' }); 
                     if (un) un.style.display = 'block'; 
@@ -1975,7 +1986,6 @@ if ('serviceWorker' in navigator) {
                         if (nw.state === 'installed' && navigator.serviceWorker.controller) {
                             // Opcional: Mostrar notificación visual brevemente
                             // if (un) un.style.display = 'block';
-                            
                             // FORZAR: Enviar mensaje para activar el nuevo SW inmediatamente
                             nw.postMessage({ type: 'SKIP_WAITING' });
                         }
@@ -2001,10 +2011,10 @@ if ('serviceWorker' in navigator) {
         }
     });
 }
-   
-// =======================================================================
+
+// ===============================================================
 // INTERACCIÓN DE TOOLTIP (Floating UI)
-// =======================================================================
+// ===============================================================
 const trackCredits = document.getElementById('trackCredits');
 const tooltipEl = document.getElementById('tooltip-credits');
 
@@ -2037,12 +2047,12 @@ if (trackCredits && tooltipEl) {
     trackCredits.addEventListener('blur', hideTooltip);
 }
 
-// =======================================================================
+// ===============================================================
 // FIN TRY...CATCH
-// =======================================================================
+// ===============================================================
 } catch (error) {
     console.error("Error fatal:", error);
     const le = document.getElementById('loadingStations');
     if (le) { le.textContent = `Error crítico: ${error.message}.`; le.style.color = '#ff6600'; }
-}
+} });
 });
