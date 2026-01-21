@@ -1,5 +1,4 @@
 // workers/api/api-handler.js
-// caché Server-Side integrada + Request Coalescing (Anti-429)
 
 // ===============================================================
 //  CONFIGURACIÓN DE ENCABEZADOS
@@ -73,54 +72,6 @@ function getAlbumTypeDescription(album) {
 
   return "Álbum";
 }
-
-// ===============================================================
-//  ODESLI / SONGLINK HANDLER
-// ===============================================================
-/**
- * Obtiene los enlaces universales.
- * Devuelve un objeto con { success: bool, data: ..., error: ... }
- */
-async function getOdesliLinks(spotifyUrl) {
-  try {
-    // Endpoint público de Odesli v1-alpha.1
-    const apiUrl = `https://api.song.link/v1-alpha.1/links?url=${encodeURIComponent(spotifyUrl)}&userCountry=AR`;
-    
-    // Agregamos User-Agent para simular un navegador real
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    };
-
-    const response = await fetch(apiUrl, { headers });
-    
-    // Si la respuesta HTTP no es OK (ej: 404, 500, 429)
-    if (!response.ok) {
-      return { 
-        success: false, 
-        status: response.status, 
-        error: `HTTP Error ${response.status}` 
-      };
-    }
-
-    const data = await response.json();
-    
-    // Si la API no devuelve pageUrl
-    if (!data || !data.pageUrl) {
-      return { success: false, error: "Odesli found no pageUrl in response" };
-    }
-    
-    return { success: true, data: data };
-
-  } catch (e) {
-    return { success: false, error: e.message };
-  }
-}
-
-// ===============================================================
-//  GESTIÓN DE COALESCING (Anti-429)
-// ===============================================================
-// Mapa global para almacenar peticiones en curso.
-const pendingOdesliRequests = new Map();
 
 // ===============================================================
 //  SPOTIFY HANDLER
@@ -203,79 +154,6 @@ async function handleSpotifyRequest(request, env, ctx) {
       const albumData = track.album;
       
       const spotifyUrl = track.external_urls?.spotify || "NO_URL";
-      
-      // =================================================================
-      // CACHÉ KV + COALESCING (Optimización Anti-429)
-      // =================================================================
-      const cacheKey = `odesli_cache:${spotifyUrl}`;
-      let odesliResult;
-
-      try {
-          const cachedData = await env.AREA51_KV.get(cacheKey, { type: 'json' });
-          
-          if (cachedData) {
-              if (cachedData._cachedError) {
-                  // Negative Cache Hit
-                  odesliResult = { 
-                      success: false, 
-                      error: cachedData.error, 
-                      status: cachedData.status,
-                      isCachedError: true 
-                  };
-              } else {
-                  // Positive Cache Hit
-                  odesliResult = { success: true, data: cachedData };
-              }
-          } else {
-              // Cache Miss
-              if (pendingOdesliRequests.has(cacheKey)) {
-                  // Reutilizar petición en curso (Coalescing)
-                  odesliResult = await pendingOdesliRequests.get(cacheKey);
-              } else {
-                  // Nueva petición externa
-                  const fetchPromise = (async () => {
-                      try {
-                          const result = await getOdesliLinks(spotifyUrl);
-
-                          if (result.success) {
-                              // Guardar en KV (30 días)
-                              ctx.waitUntil(
-                                  env.AREA51_KV.put(cacheKey, JSON.stringify(result.data), {
-                                      expirationTtl: 2592000 
-                                  })
-                              );
-                          } else {
-                              // Negative Caching si es error de servidor o límite de tasa (15 min)
-                              if (result.status === 429 || result.status >= 500) {
-                                  ctx.waitUntil(
-                                      env.AREA51_KV.put(cacheKey, JSON.stringify({
-                                          _cachedError: true,
-                                          error: result.error,
-                                          status: result.status
-                                      }), {
-                                          expirationTtl: 900 
-                                      })
-                                  );
-                              }
-                          }
-                          return result;
-                      } catch (e) {
-                           return { success: false, error: e.message };
-                      } finally {
-                          pendingOdesliRequests.delete(cacheKey);
-                      }
-                  })();
-
-                  pendingOdesliRequests.set(cacheKey, fetchPromise);
-                  odesliResult = await fetchPromise;
-              }
-          }
-      } catch (kvError) {
-          console.error(`[KV Cache] Error: ${kvError.message}. Continuando sin caché.`);
-          // Fallback simple si falla KV
-          odesliResult = await getOdesliLinks(spotifyUrl);
-      }
-      // =================================================================
 
       let trackIsrc = null;
       if (track.id) {
@@ -304,9 +182,8 @@ async function handleSpotifyRequest(request, env, ctx) {
         trackNumber: null,
         albumTypeDescription: getAlbumTypeDescription(albumData),
         isrc: trackIsrc,
-        links: null,
-        debugSpotifyUrl: spotifyUrl,
-        odesliError: null
+        links: null, // Odesli se maneja ahora en app.js
+        debugSpotifyUrl: spotifyUrl // Necesario para que app.js consulte Odesli
       };
 
       // Obtener detalles adicionales del álbum
@@ -350,21 +227,6 @@ async function handleSpotifyRequest(request, env, ctx) {
         resp.genres = [...new Set((await Promise.all(tasks)).flat())];
       }
 
-      // Asignar enlaces Odesli
-      if (odesliResult.success) {
-        resp.links = {
-          universalLink: odesliResult.data.pageUrl,
-          platforms: odesliResult.data.linksByPlatform || {}
-        };
-        resp.odesliError = null;
-      } else {
-        resp.links = null;
-        resp.odesliError = odesliResult.error;
-        if (!odesliResult.isCachedError) {
-            console.error(`Odesli API failed for ${spotifyUrl}:`, odesliResult.error);
-        }
-      }
-
       return new Response(JSON.stringify(resp), {
         status: 200,
         headers: { "Content-Type": "application/json" }
@@ -384,8 +246,7 @@ async function handleSpotifyRequest(request, env, ctx) {
         albumTypeDescription: null,
         isrc: null,
         links: null,
-        debugSpotifyUrl: "NOT_FOUND",
-        odesliError: "Track not found in Spotify"
+        debugSpotifyUrl: "NOT_FOUND"
       }),
       {
         status: 404,
