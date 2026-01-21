@@ -1,4 +1,4 @@
-// app.js - v4.3
+// app.js - v4.3 (DOM RENDER VERSION)
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm';
 
@@ -604,32 +604,93 @@ function displayAlbumCover(img) {
     displayImg.classList.add('loaded');
     albumCover.appendChild(displayImg);
 }
+
+// ==========================================================================
+// FIX: resetAlbumCover REESCRITO SIN TEMPLATE LITERALS
+// ==========================================================================
 function resetAlbumCover() {
-    albumCover.innerHTML = `
-        <div class="album-cover-placeholder">
-            <svg viewBox="0 0 640 640" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                    <filter id="glow">
-                        <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
-                        <feMerge>
-                            <feMergeNode in="coloredBlur"/>
-                            <feMergeNode in="SourceGraphic"/>
-                        </feMerge>
-                    </filter>
-                </defs>
-                <rect width="640" height="640" fill="#0A0A0A" />
-                <g stroke="#333333" stroke-width="2" fill="none">
-                    <circle cx="320" cy="320" r="280" />
-                    <circle cx="320" cy="320" r="220" />
-                    <circle cx="320" cy="320" r="160" />
-                </g>
-                <g transform="translate(320, 320)">
-                    <path d="M -90 -80 L -90 80 C -90 80, -60 100, -30 80 L 30 0 L 90 80 M 90 80 M 90 -80 L 90 80" stroke="#FF7A00" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none" filter="url(#glow)" />
-                </g>
-            </svg>
-        </div>
-    `;
+    // Limpieza inicial
+    albumCover.innerHTML = '';
+    
+    // Crear contenedor
+    const container = document.createElement('div');
+    container.className = 'album-cover-placeholder';
+
+    // Crear SVG
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute('viewBox', '0 0 640 640');
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+
+    // Crear Defs (Glow)
+    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    const filter = document.createElementNS("http://www.w3.org/2000/svg", "filter");
+    filter.setAttribute('id', 'glow');
+    defs.appendChild(filter);
+    
+    const blur = document.createElementNS("http://www.w3.org/2000/svg", "feGaussianBlur");
+    blur.setAttribute('stdDeviation', '6');
+    blur.setAttribute('result', 'coloredBlur');
+    filter.appendChild(blur);
+    
+    const merge = document.createElementNS("http://www.w3.org/2000/svg", "feMerge");
+    const mergeNode1 = document.createElementNS("http://www.w3.org/2000/svg", "feMergeNode");
+    mergeNode1.setAttribute('in', 'coloredBlur');
+    merge.appendChild(mergeNode1);
+    
+    const mergeNode2 = document.createElementNS("http://www.w3.org/2000/svg", "feMergeNode");
+    mergeNode2.setAttribute('in', 'SourceGraphic');
+    merge.appendChild(mergeNode2);
+    
+    filter.appendChild(merge);
+    defs.appendChild(filter);
+    svg.appendChild(defs);
+
+    // Rectángulo fondo
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rect.setAttribute('width', '640');
+    rect.setAttribute('height', '640');
+    rect.setAttribute('fill', '#0A0A0A');
+    svg.appendChild(rect);
+
+    // Grupo Círculos
+    const gCircles = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    gCircles.setAttribute('stroke', '#333333');
+    gCircles.setAttribute('stroke-width', '2');
+    gCircles.setAttribute('fill', 'none');
+
+    const c1 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    c1.setAttribute('cx', '320'); c1.setAttribute('cy', '320'); c1.setAttribute('r', '280');
+    gCircles.appendChild(c1);
+
+    const c2 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    c2.setAttribute('cx', '320'); c2.setAttribute('cy', '320'); c2.setAttribute('r', '220');
+    gCircles.appendChild(c2);
+
+    const c3 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    c3.setAttribute('cx', '320'); c3.setAttribute('cy', '320'); c3.setAttribute('r', '160');
+    gCircles.appendChild(c3);
+    svg.appendChild(gCircles);
+
+    // Grupo Path (Waveform)
+    const gPath = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    gPath.setAttribute('transform', 'translate(320, 320)');
+    
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute('d', 'M -90 -80 L -90 80 C -90 80, -60 100, -30 80 L 30 0 L 90 80 M 90 80 M 90 -80 L 90 80');
+    path.setAttribute('stroke', '#FF7A00');
+    path.setAttribute('stroke-width', '20');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('filter', 'url(#glow)');
+    gPath.appendChild(path);
+    svg.appendChild(gPath);
+
+    container.appendChild(svg);
+    albumCover.appendChild(container);
 }
+// FIN FIX RESET ALBUM COVER
 
 // ==========================================================================
 // LÓGICA
@@ -822,7 +883,7 @@ async function playStation() {
             updateSongInfo(true);
             startRadioParadisePolling();
         } else {
-            setTimeout(() => startSongInfoUpdates(),5000);
+            setTimeout(() => startSongInfoUpdates(), 5000);
         }
         if (installInvitationTimeout === null) setTimeout(showInstallInvitation, 600000);
         setTimeout(() => { if (isPlaying) startPlaybackChecks(); }, 2000);
@@ -1645,7 +1706,7 @@ const connectionManager = {
                 if (currentStation && currentStation.service !== 'nrk') {
                     if (currentStation.service === 'somafm') startSomaFmPolling();
                     else if (currentStation.service === 'radioparadise') startRadioParadisePolling();
-                    else { startSongInfoUpdates(); }
+                    else if (currentStation.service === 'nrk') startSongInfoUpdates();
                     updateSongInfo(true);
                 }
             } catch (e) { this.attemptReconnect(); }
@@ -1769,24 +1830,19 @@ if (shareWhatsApp) {
             const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
             if (isBrave) {
                 showNotification('En Brave, toca el enlace para abrir WhatsApp Web');
-                setTimeout(() => {
-                    const url = 'https://wa.me/?text=' + encodeURIComponent(m);
-                    window.open(url, '_blank');
-                }, 1000);
+                const url = 'https://wa.me/?text=' + encodeURIComponent(m);
+                setTimeout(() => { window.open(url, '_blank'); }, 1000);
             } else if (isMob) {
-                const url = 'whatsapp://send?text=' + encodeURIComponent(m);
+                const uri = 'whatsapp://send?text=' + encodeURIComponent(m);
                 const link = document.createElement('a');
-                link.href = url; 
+                link.href = uri; 
                 link.target = '_blank'; 
                 link.rel = 'noopener noreferrer';
                 document.body.appendChild(link); 
                 link.click(); 
                 document.body.removeChild(link);
-                
-                setTimeout(() => {
-                    const url2 = 'https://wa.me/?text=' + encodeURIComponent(m);
-                    window.open(url2, '_blank');
-                }, 1500);
+                const url2 = 'https://wa.me/?text=' + encodeURIComponent(m);
+                setTimeout(() => { window.open(url2, '_blank'); }, 1500);
             } else {
                 const url = 'https://wa.me/?text=' + encodeURIComponent(m);
                 window.open(url, '_blank');
