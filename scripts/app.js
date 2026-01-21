@@ -1,4 +1,4 @@
-// app.js - v4.0
+// app.js - v4.1
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm';
 
@@ -984,34 +984,38 @@ async function fetchSongDetails(artist, title, album, fetchId) {
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const d = await res.json();
         
+        // =================================================================
+        // Muro de Seguridad 1: Verificar ANTES de actualizar UI de Spotify
+        // =================================================================
+        if (fetchId !== currentSongFetchId) return;
+        // =================================================================
+        
         // Solo verificamos si 'd' existe, no si tiene imagen
         if (d) {
-    
-        if (d.imageUrl) {
-         displayAlbumCoverFromUrl(d.imageUrl);
-        }
-    
-        updateAlbumDetailsWithSpotifyData(d, d.links);
+            if (d.imageUrl) {
+                displayAlbumCoverFromUrl(d.imageUrl);
+            }
+            updateAlbumDetailsWithSpotifyData(d, d.links);
 
-        if (d.duration) {
-          trackDuration = d.duration;
-          const m = Math.floor(trackDuration / 60);
-          const s = Math.floor(trackDuration % 60);
-          totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-        }
-    
-        // Capturamos el ISRC si Spotify lo tiene
-        if (d.isrc) {
-           spotifyIsrc = d.isrc;
-        }
-    
-        // MEJORA: Guardamos el artista y título exactos de Spotify...
-        if (d.artists && Array.isArray(d.artists)) {
-          spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
-        }
-           if (d.title) {
-              spotifyCleanTitle = d.title;
-           }
+            if (d.duration) {
+              trackDuration = d.duration;
+              const m = Math.floor(trackDuration / 60);
+              const s = Math.floor(trackDuration % 60);
+              totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            }
+        
+            // Capturamos el ISRC si Spotify lo tiene
+            if (d.isrc) {
+               spotifyIsrc = d.isrc;
+            }
+        
+            // MEJORA: Guardamos el artista y título exactos de Spotify...
+            if (d.artists && Array.isArray(d.artists)) {
+              spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
+            }
+               if (d.title) {
+                  spotifyCleanTitle = d.title;
+               }
         }
         
         // Llamamos a MusicBrainz pasando los datos de Spotify para el rescate
@@ -1150,7 +1154,13 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
         if (recordingId) {
             try {
                 await new Promise(resolve => setTimeout(resolve, 1100)); 
+                
+                // =================================================================
+                // Muro de Seguridad 3: Verificar DESPUÉS del Sleep (Punto Crítico)
+                // =================================================================
                 if (fetchId !== currentSongFetchId) return;
+                // =================================================================
+                
                 const creditsUrl = `https://musicbrainz.org/ws/2/recording/${recordingId}?inc=artist-rels&fmt=json`;
                 const creditsRes = await fetch(creditsUrl, { headers: { 'User-Agent': 'RadioStreamingPlayer/1.0 (https://radiomax.tramax.com.ar)' } });
                 
