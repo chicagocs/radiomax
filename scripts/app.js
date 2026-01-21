@@ -1846,7 +1846,10 @@ if (installPwaBtnIos) {
 }
 setTimeout(showInstallPwaButtons, 1000);
 
-if (shareButton) { shareButton.addEventListener('click', () => { shareOptions.classList.toggle('active'); });
+if (shareButton) { 
+    // CORREGIDO: Agregada la llave de cierre } para el if (shareButton)
+    shareButton.addEventListener('click', () => { shareOptions.classList.toggle('active'); }); 
+}
 document.addEventListener('click', (e) => { if (shareButton && shareOptions && !shareButton.contains(e.target) && !shareOptions.contains(e.target)) shareOptions.classList.remove('active'); });
 
 if (shareWhatsApp) {
@@ -1865,16 +1868,13 @@ if (shareWhatsApp) {
             const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
             if (isBrave) {
                 showNotification('En Brave, toca el enlace para abrir WhatsApp Web');
-                // CORREGIDO: Agregada la comilla invertida de cierre
                 setTimeout(() => { window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank'); }, 1000);
             } else if (isMob) {
                 const uri = `whatsapp://send?text=${encodeURIComponent(m)}`;
                 const link = document.createElement('a');
                 link.href = uri; link.target = '_blank'; link.rel = 'noopener noreferrer';
                 document.body.appendChild(link); link.click(); document.body.removeChild(link);
-                // CORREGIDO: Agregada la comilla invertida de cierre
                 setTimeout(() => { window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank'); }, 1500);
-            // CORREGIDO: Agregada la comilla invertida de cierre
             } else window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank');
             if (shareOptions) shareOptions.classList.remove('active');
         } else showNotification('Por favor, espera a que comience una canción para compartir');
@@ -1944,7 +1944,7 @@ document.addEventListener('keydown', function(event) {
             const custom = document.querySelector('.custom-select-wrapper');
             const trig = custom.querySelector('.custom-select-trigger');
             const st = stationsById[id];
-            let txt = st.service === 'radioparadise' ? st.name.split(' - ')[1] || st.name : st.name;
+            let txt = st.service === 'radioparadise' ? (st.name.split(' - ')[1] || st.name) : st.name;
             trig.textContent = txt;
             custom.querySelectorAll('.custom-option').forEach(o => o.classList.remove('selected'));
             opt.classList.add('selected');
