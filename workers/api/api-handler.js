@@ -1,6 +1,6 @@
-// workers/api/api-handler.js
-// Versión On-Demand Segura
-
+// ==========================================================================
+// CONFIGURACIÓN DE HEADERS Y SEGURIDAD
+// ==========================================================================
 const corsHeaders = {
   "Access-Control-Allow-Origin": "https://radiomax.tramax.com.ar",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
@@ -20,7 +20,9 @@ const securityHeaders = {
   "Cross-Origin-Resource-Policy": "same-origin"
 };
 
-// --- UTILIDADES ---
+// ==========================================================================
+// UTILIDADES
+// ==========================================================================
 function cleanSearchTerm(term) {
   if (!term) return "";
   return term.replace(/[()\[\]{}]/g, " ").replace(/\s+/g, " ").trim();
@@ -36,8 +38,10 @@ function getAlbumTypeDescription(album) {
   return "Álbum";
 }
 
-// --- SPOTIFY HANDLER ---
-async function handleSpotifyRequest(request, env, ctx) {
+// ==========================================================================
+// HANDLER: SPOTIFY
+// ==========================================================================
+async function handleSpotifyRequest(request, env) {
   try {
     const url = new URL(request.url);
     const artist = cleanSearchTerm(url.searchParams.get("artist"));
@@ -67,19 +71,22 @@ async function handleSpotifyRequest(request, env, ctx) {
     let searchData = null;
     let responseSpotify = null;
 
+    // Intento 1: Con álbum
     if (album) {
       const q = `track:"${title}" artist:"${artist}" album:"${album}"`;
       responseSpotify = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=5`, { headers: { Authorization: `Bearer ${accessToken}` } });
       if (responseSpotify.ok) searchData = await responseSpotify.json();
     }
 
-    if (!searchData || searchData.tracks.items.length ===0) {
+    // Intento 2: Sin álbum
+    if (!searchData || searchData.tracks.items.length === 0) {
       const q = `track:"${title}" artist:"${artist}"`;
       responseSpotify = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=5`, { headers: { Authorization: `Bearer ${accessToken}` } });
       if (responseSpotify.ok) searchData = await responseSpotify.json();
     }
 
-    if (!searchData || searchData.tracks.items.length ===0) {
+    // Intento 3: Búsqueda laxa
+    if (!searchData || searchData.tracks.items.length === 0) {
       const q = `${artist} ${title}`;
       responseSpotify = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=5`, { headers: { Authorization: `Bearer ${accessToken}` } });
       if (responseSpotify.ok) searchData = await responseSpotify.json();
@@ -157,88 +164,68 @@ async function handleSpotifyRequest(request, env, ctx) {
   }
 }
 
-// --- ODESLI PROXY (VERSIÓN DIAGNÓSTICA Y CABECERAS ROBUSTAS) ---
+// ==========================================================================
+// HANDLER: ODESLI (PROXY ROBUSTO)
+// ==========================================================================
 async function handleOdesliProxyRequest(request) {
-  // Intentamos forzar el log en Real-time Logs, no solo en Analytics
-  console.log(`[Odesli Handler] Inicio. URL: ${request.url}`);
-  
   try {
     const url = new URL(request.url);
     const spotifyUrl = url.searchParams.get("url");
 
-    console.log(`[Odesli Handler] SpotifyUrl recibida: ${spotifyUrl}`);
-
     if (!spotifyUrl || spotifyUrl === "NO_URL" || spotifyUrl.trim() === "") {
-      console.warn("[Odesli Handler] URL vacía o inválida.");
-      return new Response(JSON.stringify({ error: "URL de Spotify inválida", received: spotifyUrl }), { 
-        status: 400, 
-        headers: { "Content-Type": "application/json" } 
-      });
+      return new Response(JSON.stringify({ error: "URL de Spotify inválida" }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
 
-    // 1. Construcción de la URL de Odesli
-    // Eliminamos userCountry=AR para usar la detección por defecto de la API (a veces AR tiene menos datos)
-    // o usa US si prefieres: &userCountry=US
+    // Usamos userCountry por defecto de la API (sin especificar) para evitar bloqueos regionales
     const apiUrl = `https://api.song.link/v1-alpha.1/links?url=${encodeURIComponent(spotifyUrl)}`;
     
-    console.log(`[Odesli Handler] Llamando a API Odesli: ${apiUrl}`);
-
-    // 2. Cabeceras Críticas
-    // Agregamos 'Referer' porque Odesli a menudo lo requiere para validar la solicitud legítima.
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Accept': 'application/json',
       'Accept-Language': 'en-US,en;q=0.9',
-      'Referer': 'https://song.link/' // CABECERA CLAVE PARA EVITAR BLOQUEOS 403/404
+      'Referer': 'https://song.link/' 
     };
 
     const response = await fetch(apiUrl, { headers });
-    console.log(`[Odesli Handler] Respuesta Odesli Status: ${response.status}`);
 
     if (!response.ok) {
-      // Si Odesli responde 404, devolvemos 404, pero logueamos el cuerpo del error
       const errorText = await response.text();
-      console.error(`[Odesli Handler] Error Odesli: ${response.status} - ${errorText}`);
-      
       return new Response(JSON.stringify({ 
         error: `Error API Odesli: ${response.status}`, 
-        details: errorText,
-        queriedUrl: spotifyUrl 
+        details: errorText 
       }), { status: response.status, headers: { "Content-Type": "application/json" } });
     }
 
     const data = await response.json();
-    console.log(`[Odesli Handler] JSON recibido. Keys: ${Object.keys(data).join(', ')}`);
 
-    // 3. Extracción del enlace
     let targetLink = null;
 
+    // 1. Enlace Universal (pageUrl)
     if (data.pageUrl) {
       targetLink = data.pageUrl;
-    } else if (data.linksByPlatform && data.linksByPlatform.spotify && data.linksByPlatform.spotify.url) {
-      console.log("[Odesli Handler] Fallback: Usando link directo de Spotify");
+    } 
+    // 2. Fallback: Link directo de Spotify
+    else if (data.linksByPlatform && data.linksByPlatform.spotify && data.linksByPlatform.spotify.url) {
       targetLink = data.linksByPlatform.spotify.url;
     }
 
     if (targetLink) {
-      console.log(`[Odesli Handler] Éxito: ${targetLink}`);
       return new Response(JSON.stringify({ universalLink: targetLink }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
-    // 4. Si llegamos aquí, no encontramos enlaces
-    console.error("[Odesli Handler] Estructura JSON no contiene enlaces válidos", data);
     return new Response(JSON.stringify({ 
-      error: "No se encontraron enlaces en la respuesta (Track inválido o inexistente)", 
+      error: "No se encontraron enlaces", 
       debugResponse: data 
     }), { status: 404, headers: { "Content-Type": "application/json" } });
 
   } catch (e) {
-    console.error("[Odesli Handler] EXCEPCIÓN FATAL:", e);
-    return new Response(JSON.stringify({ error: e.message, stack: e.stack }), { status: 500, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 }
 
-// --- RADIO PARADISE HANDLER ---
+// ==========================================================================
+// HANDLER: RADIO PARADISE
+// ==========================================================================
 async function handleRadioParadiseRequest(request) {
   try {
     const url = new URL(request.url);
@@ -254,38 +241,54 @@ async function handleRadioParadiseRequest(request) {
   }
 }
 
-// --- EXPORT ---
+// ==========================================================================
+// MAIN HANDLER (ROUTER)
+// ==========================================================================
 export default {
   async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-    let response;
+    // Try-Catch global para evitar errores CORS si algo falla inesperadamente
+    try {
+      const url = new URL(request.url);
+      let response;
 
-    if (request.method === "OPTIONS") return new Response(null, { status: 200, headers: corsHeaders });
-
-    // 1. Verificar rutas específicas
-    if (url.pathname.startsWith("/spotify")) {
-      response = await handleSpotifyRequest(request, env, ctx);
-    } else if (url.pathname.startsWith("/odesli")) {
-      // ESTA ES LA RUTA QUE ESTÁ FALLANDO POR NO ESTAR DESPLEGADA
-      console.log("ROUTER: Redirigiendo a /odesli");
-      response = await handleOdesliProxyRequest(request);
-    } else if (url.pathname.startsWith("/radioparadise")) {
-      response = await handleRadioParadiseRequest(request);
-    } else {
-      // 2. Fallback a Assets Estáticos
-      if (env.ASSETS) {
-        try { response = await env.ASSETS.fetch(request); }
-        catch (err) { response = await env.ASSETS.fetch(new Request("/index.html", request)); }
-      } else {
-        response = new Response("<h1>OK</h1>", { status: 200, headers: { "Content-Type": "text/html" } });
+      if (request.method === "OPTIONS") {
+        return new Response(null, { status: 200, headers: corsHeaders });
       }
-    }
 
-    // 3. Aplicar Headers a cualquier respuesta
-    const finalHeaders = new Headers(response.headers);
-    Object.entries(corsHeaders).forEach(([key, value]) => finalHeaders.set(key, value));
-    Object.entries(securityHeaders).forEach(([key, value]) => finalHeaders.set(key, value));
-       
-    return new Response(response.body, { status: response.status, statusText: response.statusText, headers: finalHeaders });
+      // 1. Rutas específicas
+      if (url.pathname.startsWith("/spotify")) {
+        response = await handleSpotifyRequest(request, env);
+      } else if (url.pathname.startsWith("/odesli")) {
+        response = await handleOdesliProxyRequest(request);
+      } else if (url.pathname.startsWith("/radioparadise")) {
+        response = await handleRadioParadiseRequest(request);
+      } else {
+        // 2. Fallback a Assets Estáticos
+        if (env.ASSETS) {
+          try { response = await env.ASSETS.fetch(request); }
+          catch (err) { response = await env.ASSETS.fetch(new Request("/index.html", request)); }
+        } else {
+          response = new Response("<h1>OK</h1>", { status: 200, headers: { "Content-Type": "text/html" } });
+        }
+      }
+
+      // 3. Aplicar Headers a cualquier respuesta exitosa
+      const finalHeaders = new Headers(response.headers);
+      Object.entries(corsHeaders).forEach(([key, value]) => finalHeaders.set(key, value));
+      Object.entries(securityHeaders).forEach(([key, value]) => finalHeaders.set(key, value));
+         
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers: finalHeaders });
+
+    } catch (err) {
+      // Si todo falla, devolvemos un error JSON seguro con CORS
+      console.error("CRITICAL ERROR:", err);
+      return new Response(JSON.stringify({ error: err.message || "Error interno del servidor" }), { 
+        status: 500, 
+        headers: {
+           ...corsHeaders,
+           "Content-Type": "application/json" 
+        } 
+      });
+    }
   }
 };
