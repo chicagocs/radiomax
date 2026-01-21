@@ -111,7 +111,7 @@ async function joinStation(stationId) {
     
     currentStationId = stationId;
     
-    const channelName = `station:${stationId}`;
+    const channelName = 'station:' + stationId;
     const channel = supabase.channel(channelName, {
         config: { presence: { key: getUserUniqueID() } }
     });
@@ -219,7 +219,7 @@ function canMakeApiCall(service) {
 }
 
 function logErrorForAnalysis(type, details) {
-    console.error(`Error logged: ${type}`, details);
+    console.error('Error logged: ' + type, details);
 }
 
 function updateVolumeIconPosition() {
@@ -227,7 +227,7 @@ function updateVolumeIconPosition() {
     const percent = volumeSlider.value / volumeSlider.max;
     const iconWidth = volumeIcon.offsetWidth;
     const newPosition = percent * sliderWidth - (iconWidth /2);
-    volumeIcon.style.left = `${newPosition}px`;
+    volumeIcon.style.left = String(newPosition) + 'px';
 }
 
 function updateTooltipPosition() {
@@ -254,8 +254,8 @@ function updateTooltipPosition() {
         ]
     }).then(({x, y, placement}) => {
         Object.assign(tooltipEl.style, {
-            left: `${x}px`,
-            top: `${y}px`,
+            left: String(x) + 'px',
+            top: String(y) + 'px',
         });
     });
 }
@@ -379,15 +379,15 @@ function getFavorites() {
 }
 function saveFavorites(list) { try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(list)); } catch (e) {} }
 function updateFavoriteButtonUI(id, fav) {
-    const btn = document.querySelector(`.favorite-btn[data-station-id="${id}"]`);
+    const btn = document.querySelector('.favorite-btn[data-station-id="' + id + '"]');
     if (!btn) return;
     const name = btn.closest('.custom-option').querySelector('.custom-option-name').textContent;
     if (fav) {
         btn.innerHTML = '★'; btn.classList.add('is-favorite');
-        btn.setAttribute('aria-label', `Quitar ${name} de favoritos`);
+        btn.setAttribute('aria-label', 'Quitar ' + name + ' de favoritos');
     } else {
         btn.innerHTML = '☆'; btn.classList.remove('is-favorite');
-        btn.setAttribute('aria-label', `Añadir ${name} a favoritos`);
+        btn.setAttribute('aria-label', 'Añadir ' + name + ' a favoritos');
     }
 }
 function addFavorite(id) {
@@ -507,7 +507,7 @@ class CustomSelect {
         favBtn.className = 'favorite-btn';
         favBtn.innerHTML = '☆';
         favBtn.dataset.stationId = option.value;
-        favBtn.setAttribute('aria-label', `Añadir ${name} a favoritos`);
+        favBtn.setAttribute('aria-label', 'Añadir ' + name + ' a favoritos');
         favBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const sid = e.target.dataset.stationId;
@@ -521,7 +521,7 @@ class CustomSelect {
                 const link = document.createElement('a');
                 link.href = p.url;
                 link.textContent = p.text;
-                link.className = `station-promotion-link station-promotion-link-${p.type}`;
+                link.className = 'station-promotion-link station-promotion-link-' + p.type;
                 link.target = '_blank';
                 link.rel = 'noopener noreferrer';
                 promosContainer.appendChild(link);
@@ -637,7 +637,7 @@ function resetAlbumCover() {
 async function loadStations() {
     try {
         const res = await fetch('/stations.json');
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        if (!res.ok) throw new Error("HTTP error! status: " + res.status);
         const allStations = await res.json();
         const grouped = allStations.reduce((acc, s) => {
             const name = s.service === 'somafm' ? 'SomaFM' : s.service === 'radioparadise' ? 'Radio Paradise' : s.service === 'nrk' ? 'NRK Radio' : 'Otro';
@@ -800,7 +800,7 @@ async function playStation() {
     if (currentStation.service === 'nrk') {
         audioPlayer.addEventListener('loadedmetadata', () => {
             trackDuration = audioPlayer.duration; trackStartTime = Date.now();
-            const newTrack = { title: currentStation.name, artist: currentStation.description, album: `Emisión del ${extractDateFromUrl(currentStation.url)}` };
+            const newTrack = { title: currentStation.name, artist: currentStation.description, album: 'Emisión del ' + extractDateFromUrl(currentStation.url) };
             currentTrackInfo = newTrack; updateUIWithTrackInfo(newTrack);
             resetAlbumCover(); resetAlbumDetails(); startCountdown(); updateShareButtonVisibility();
         }, { once: true });
@@ -836,7 +836,7 @@ async function playStation() {
 
 function extractDateFromUrl(url) {
     const m = url.match(/nrk_radio_klassisk_natt_(\d{8})_/);
-    return m ? `${m[1].substring(6, 8)}-${m[1].substring(4, 6)}-${m[1].substring(0, 4)}` : 'Fecha desconocida';
+    return m ? m[1].substring(6, 8) + '-' + m[1].substring(4, 6) + '-' + m[1].substring(0, 4) : 'Fecha desconocida';
 }
 
 async function updateSongInfo(bypassRateLimit = false) {
@@ -850,8 +850,8 @@ async function updateSomaFmInfo(bypassRateLimit = false) {
     if (isUpdatingSongInfo) return; 
     isUpdatingSongInfo = true;
     try {
-        const res = await fetch(`https://api.somafm.com/songs/${currentStation.id}.json`);
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        const res = await fetch('https://api.somafm.com/songs/' + currentStation.id + '.json');
+        if (!res.ok) throw new Error("HTTP error! status: " + res.status);
         const data = await res.json();
         if (data.songs && data.songs.length > 0) {
             const s = data.songs[0];
@@ -894,10 +894,10 @@ async function updateRadioParadiseInfo(bypassRateLimit = false) {
     isUpdatingSongInfo = true;
     try {
         const w = 'https://core.chcs.workers.dev/radioparadise';
-        const p = `api/now_playing?chan=${currentStation.channelId ?? 1}`;
-        const u = `${w}?url=${encodeURIComponent(p)}`;
+        const p = 'api/now_playing?chan=' + (currentStation.channelId ?? 1);
+        const u = w + '?url=' + encodeURIComponent(p);
         const res = await fetch(u);
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        if (!res.ok) throw new Error("HTTP error! status: " + res.status);
         const d = await res.json();
         const newTrack = { title: d.title || 'Título desconocido', artist: d.artist || 'Artista desconocido', album: d.album || '' };
         const isNew = !currentTrackInfo || currentTrackInfo.title !== newTrack.title || currentTrackInfo.artist !== newTrack.artist;
@@ -951,9 +951,10 @@ async function fetchSongDetails(artist, title, album, fetchId, fetchLinksActive 
     let spotifyCleanTitle = '';
 
     try {
-        const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(sA)}&title=${encodeURIComponent(sT)}&album=${encodeURIComponent(sAl)}&linksOnly=${fetchLinksActive}`;
+        // SAFE CONCATENATION: Using + instead of ``
+        const u = 'https://core.chcs.workers.dev/spotify?artist=' + encodeURIComponent(sA) + '&title=' + encodeURIComponent(sT) + '&album=' + encodeURIComponent(sAl) + '&linksOnly=' + fetchLinksActive;
         const res = await fetch(u);
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        if (!res.ok) throw new Error("HTTP error! status: " + res.status);
         const d = await res.json();
         
         if (fetchId !== currentSongFetchId) return;
@@ -973,7 +974,7 @@ async function fetchSongDetails(artist, title, album, fetchId, fetchLinksActive 
               trackDuration = d.duration;
               const m = Math.floor(trackDuration / 60);
               const s = Math.floor(trackDuration % 60);
-              totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+              totalDuration.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
             }
         
             if (d.isrc) {
@@ -1025,9 +1026,10 @@ function formatCreditsList(relations) {
 
     const sortedRoles = Object.keys(roleMap).sort((a, b) => a.localeCompare(b, 'es'));
 
+    // SAFE CONCATENATION
     return sortedRoles.map(role => {
         const names = roleMap[role].join(', ');
-        return `<div><b>${role}</b> ${names}</div>`;
+        return '<div><b>' + role + '</b> ' + names + '</div>';
     }).join(''); 
 }
     
@@ -1043,7 +1045,7 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
 
         if (isrc) {
             try {
-                const isrcUrl = `https://musicbrainz.org/ws/2/isrc/${isrc}?inc=artist-rels&fmt=json`;
+                const isrcUrl = 'https://musicbrainz.org/ws/2/isrc/' + isrc + '?inc=artist-rels&fmt=json';
                 const res = await fetch(isrcUrl, { headers: { 'User-Agent': 'RadioStreamingPlayer/1.0 (https://radiomax.tramax.com.ar)' } });
                 
                 if (res.ok) {
@@ -1055,7 +1057,7 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
                             trackDuration = Math.floor(r.length / 1000);
                             const m = Math.floor(trackDuration / 60);
                             const s = Math.floor(trackDuration % 60);
-                            totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                            totalDuration.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
                         }
 
                         const creditsElement = document.getElementById('trackCredits');
@@ -1099,10 +1101,11 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
         const searchTitle = spotifyTitle ? spotifyTitle : title;
 
         const cleanTitle = searchTitle.replace(/\([^)]*\)/g, '').trim();
-        const searchUrl = `https://musicbrainz.org/ws/2/recording/?query=artist:"${encodeURIComponent(searchArtist)}" AND recording:"${encodeURIComponent(cleanTitle)}"&fmt=json&limit=5`;
+        // SAFE CONCATENATION
+        const searchUrl = 'https://musicbrainz.org/ws/2/recording/?query=artist:"' + encodeURIComponent(searchArtist) + '" AND recording:"' + encodeURIComponent(cleanTitle) + '"&fmt=json&limit=5';
         
         const res = await fetch(searchUrl, { headers: { 'User-Agent': 'RadioStreamingPlayer/1.0 (https://radiomax.tramax.com.ar)' } });
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        if (!res.ok) throw new Error("HTTP error! status: " + res.status);
         const d = await res.json();
         
         if (d.recordings && d.recordings.length > 0) {
@@ -1112,7 +1115,7 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
                     trackDuration = Math.floor(r.length / 1000);
                     const m = Math.floor(trackDuration / 60);
                     const s = Math.floor(trackDuration % 60);
-                    totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                    totalDuration.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
                 }
                 recordingId = r.id; 
             }
@@ -1124,7 +1127,7 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
                 
                 if (fetchId !== currentSongFetchId) return;
                 
-                const creditsUrl = `https://musicbrainz.org/ws/2/recording/${recordingId}?inc=artist-rels&fmt=json`;
+                const creditsUrl = 'https://musicbrainz.org/ws/2/recording/' + recordingId + '?inc=artist-rels&fmt=json';
                 const creditsRes = await fetch(creditsUrl, { headers: { 'User-Agent': 'RadioStreamingPlayer/1.0 (https://radiomax.tramax.com.ar)' } });
                 
                 if (creditsRes.ok) {
@@ -1223,7 +1226,7 @@ function updateAlbumDetailsWithSpotifyData(d, links) {
     if (d.release_date) {
         const y = d.release_date.substring(0, 4);
         let t = y;
-        if (d.albumTypeDescription && d.albumTypeDescription !== 'Álbum') t += ` (${d.albumTypeDescription})`;
+        if (d.albumTypeDescription && d.albumTypeDescription !== 'Álbum') t += ' (' + d.albumTypeDescription + ')';
         el.textContent = t;
     } else if (el) el.textContent = '----';
     
@@ -1235,12 +1238,12 @@ function updateAlbumDetailsWithSpotifyData(d, links) {
         if (s > 10000) s = Math.floor(s / 1000);
         const m = Math.floor(s / 60);
         const sec = Math.floor(s % 60);
-        albumTotalDuration.textContent = `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+        albumTotalDuration.textContent = String(m).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
     } else albumTotalDuration.textContent = '--:--';
     
     if (d.genres && d.genres.length > 0) trackGenre.textContent = d.genres.slice(0, 2).join(', '); else trackGenre.textContent = '--';
     
-    if (d.trackNumber && d.totalTracks) trackPosition.textContent = `Track ${d.trackNumber}/${d.totalTracks}`; else trackPosition.textContent = '--/--';
+    if (d.trackNumber && d.totalTracks) trackPosition.textContent = 'Track ' + d.trackNumber + '/' + d.totalTracks; else trackPosition.textContent = '--/--';
     
     if (trackIsrc) {
         if (d.isrc && d.isrc.trim() !== '') trackIsrc.textContent = d.isrc.toUpperCase(); 
@@ -1266,7 +1269,8 @@ if (smartLinkButton) {
                 const album = songAlbum.textContent.replace(/[()]/g, '').trim();
 
                 if (artist && title) {
-                    const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&album=${encodeURIComponent(album)}&linksOnly=true`;
+                    // SAFE CONCATENATION
+                    const u = 'https://core.chcs.workers.dev/spotify?artist=' + encodeURIComponent(artist) + '&title=' + encodeURIComponent(title) + '&album=' + encodeURIComponent(album) + '&linksOnly=true';
                     const res = await fetch(u);
                     if (res.ok) {
                         const d = await res.json();
@@ -1292,7 +1296,8 @@ if (smartLinkButton) {
             const title = songTitle.textContent;
             const album = songAlbum.textContent.replace(/[()]/g, '').trim(); 
 
-            const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&album=${encodeURIComponent(album)}&linksOnly=true`;
+            // SAFE CONCATENATION
+            const u = 'https://core.chcs.workers.dev/spotify?artist=' + encodeURIComponent(artist) + '&title=' + encodeURIComponent(title) + '&album=' + encodeURIComponent(album) + '&linksOnly=true';
             
             const res = await fetch(u);
             if (!res.ok) throw new Error("Error fetching Odesli");
@@ -1315,7 +1320,7 @@ function updateUIWithTrackInfo(t) {
     if (songTitle.textContent !== t.title) songTitle.textContent = t.title;
     if (songArtist.textContent !== t.artist) songArtist.textContent = t.artist;
     
-    const albumText = t.album ? `(${t.album})` : '';
+    const albumText = t.album ? '(' + t.album + ')' : '';
     if (songAlbum.textContent !== albumText) songAlbum.textContent = albumText;
     
     updateShareButtonVisibility();
@@ -1351,7 +1356,7 @@ function startCountdown() {
     if (trackDuration > 0) {
         const m = Math.floor(trackDuration / 60);
         const s = Math.floor(trackDuration % 60);
-        totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        totalDuration.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
     } else totalDuration.textContent = '(--:--)';
 
     if (currentStation?.service === 'somafm' && !songTransitionDetected) {
@@ -1397,7 +1402,8 @@ function startCountdown() {
                 const m = Math.floor(elapsed / 60);
                 const s = Math.floor(elapsed % 60);
                 
-                displayText = `+${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                // SAFE CONCATENATION
+                displayText = '+' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
 
                 const currentElapsedSecond = Math.floor(elapsed);
                 
@@ -1412,7 +1418,8 @@ function startCountdown() {
         } else {
             const m = Math.floor(d / 60);
             const s = Math.floor(d % 60);
-            displayText = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            // SAFE CONCATENATION
+            displayText = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
             
             lastCheckedSecond = -1; 
 
@@ -1756,22 +1763,27 @@ if (shareWhatsApp) {
         if (title && artist && title !== 'a sonar' && title !== 'Conectando...' && title !== 'Seleccionar estación') {
             
             const baseUrl = window.location.origin;
-            const stationParam = currentStation ? `?station=${currentStation.id}` : '';
-            const fullUrl = `${baseUrl}${stationParam}`;
+            const stationParam = currentStation ? '?station=' + currentStation.id : '';
+            const fullUrl = baseUrl + stationParam;
 
-            const m = `Escuché ${title} de ${artist} en ${fullUrl} ¡Temazo en RadioMax!`;
+            // SAFE CONCATENATION
+            const m = 'Escuché ' + title + ' de ' + artist + ' en ' + fullUrl + ' ¡Temazo en RadioMax!';
             const isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
             if (isBrave) {
                 showNotification('En Brave, toca el enlace para abrir WhatsApp Web');
-                setTimeout(() => { window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank'); }, 1000);
+                // SAFE CONCATENATION
+                setTimeout(() => { window.open('https://wa.me/?text=' + encodeURIComponent(m), '_blank'); }, 1000);
             } else if (isMob) {
-                const uri = `whatsapp://send?text=${encodeURIComponent(m)}`;
+                // SAFE CONCATENATION
+                const uri = 'whatsapp://send?text=' + encodeURIComponent(m);
                 const link = document.createElement('a');
                 link.href = uri; link.target = '_blank'; link.rel = 'noopener noreferrer';
                 document.body.appendChild(link); link.click(); document.body.removeChild(link);
-                setTimeout(() => { window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank'); }, 1500);
-            } else window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank');
+                // SAFE CONCATENATION
+                setTimeout(() => { window.open('https://wa.me/?text=' + encodeURIComponent(m), '_blank'); }, 1500);
+            // SAFE CONCATENATION
+            } else window.open('https://wa.me/?text=' + encodeURIComponent(m), '_blank');
             if (shareOptions) shareOptions.classList.remove('active');
         } else showNotification('Por favor, espera a que comience una canción para compartir');
     });
@@ -1854,7 +1866,7 @@ if (volumeIcon) { updateVolumeIconPosition(); }
 const versionSpan = document.getElementById('version-number');
 if (versionSpan) {
     fetch('/sw.js')
-        .then(r => { if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`); return r.text(); })
+        .then(r => { if (!r.ok) throw new Error("HTTP error! status: " + r.status); return r.text(); })
         .then(t => {
             const m = t.match(/^(?:\/\/\s*)?v?(\d+(?:\.\d+){1,2})/m);
             if (m && m[1]) versionSpan.textContent = m[1];
@@ -1939,6 +1951,6 @@ if (trackCredits && tooltipEl) {
 } catch (error) {
     console.error("Error fatal:", error);
     const le = document.getElementById('loadingStations');
-    if (le) { le.textContent = `Error crítico: ${error.message}.`; le.style.color = '#ff6600'; }
+    if (le) { le.textContent = "Error crítico: " + error.message + "."; le.style.color = '#ff6600'; }
 } });
 });
