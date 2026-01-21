@@ -1,4 +1,4 @@
-// app.js - v4.2
+// app.js - v4.3
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm';
 
@@ -896,7 +896,8 @@ async function updateSomaFmInfo(bypassRateLimit = false) {
                 const fetchId = Date.now() + Math.random();
                 currentSongFetchId = fetchId;
                 
-                fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId)
+                // PASAMOS linksOnly=false para NO GASTAR CUOTA EN SEGUNDO PLANO
+                fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId, false)
                     .catch(e => console.error("Error fetchSongDetails (background):", e));
                 
                 if (rapidCheckInterval) { clearInterval(rapidCheckInterval); rapidCheckInterval = null; }
@@ -943,7 +944,8 @@ async function updateRadioParadiseInfo(bypassRateLimit = false) {
             const fetchId = Date.now() + Math.random();
             currentSongFetchId = fetchId;
 
-            fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId)
+            // PASAMOS linksOnly=false para NO GASTAR CUOTA EN SEGUNDO PLANO
+            fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId, false)
                 .catch(e => console.error("Error fetchSongDetails (background):", e));
         }
     } catch (e) {
@@ -968,7 +970,7 @@ function startRadioParadisePolling() {
     rpLoop();
 }
 
-async function fetchSongDetails(artist, title, album, fetchId) {
+async function fetchSongDetails(artist, title, album, fetchId, fetchLinksActive = false) {
     if (!artist || !title) return;
     const sA = artist.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
     const sT = title.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
@@ -980,7 +982,8 @@ async function fetchSongDetails(artist, title, album, fetchId) {
     let spotifyCleanTitle = '';
 
     try {
-        const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(sA)}&title=${encodeURIComponent(sT)}&album=${encodeURIComponent(sAl)}`;
+        // NUEVO: linksOnly controla si el Worker debe buscar Odesli
+        const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(sA)}&title=${encodeURIComponent(sT)}&album=${encodeURIComponent(sAl)}&linksOnly=${fetchLinksActive}`;
         const res = await fetch(u);
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const d = await res.json();
@@ -1281,7 +1284,7 @@ function updateAlbumDetailsWithSpotifyData(d, links) {
     const el = document.getElementById('releaseDate');
     if (el) el.innerHTML = '';
     if (d.release_date) {
-        const y = d.release_date.substring(0, 4);
+        const y = d.release_date.substring(0,4);
         let t = y;
         if (d.albumTypeDescription && d.albumTypeDescription !== 'Álbum') t += ` (${d.albumTypeDescription})`;
         el.textContent = t;
@@ -1314,7 +1317,7 @@ function updateAlbumDetailsWithSpotifyData(d, links) {
 // =======================================================================
 
 // =======================================================================
-// NUEVO: EVENTO CLICK PARA SMART LINK (Lazy Load + Rescue + FIX debugSpotifyUrl)
+// NUEVO: EVENTO CLICK PARA SMART LINK (Lazy Load + Rescue + TRUE Lazy Load)
 // =======================================================================
 if (smartLinkButton) {
     smartLinkButton.addEventListener('click', async function(e) {
@@ -1332,17 +1335,18 @@ if (smartLinkButton) {
             
             try {
                 // Intentamos buscarlo urgentemente usando lo que sale en pantalla
+                // IMPORTANTE: linksOnly=false para no gastar cuota
                 const artist = songArtist.textContent;
                 const title = songTitle.textContent;
                 const album = songAlbum.textContent;
 
                 if (artist && title) {
-                    const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&album=${encodeURIComponent(album)}`;
+                    const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&album=${encodeURIComponent(album)}&linksOnly=false`;
                     const res = await fetch(u);
                     if (res.ok) {
                         const d = await res.json();
-                        // FIX: Usar debugSpotifyUrl para el rescate
                         if (d && d.debugSpotifyUrl) {
+                            // ¡Éxito! Guardamos y continuamos el flujo normal
                             currentSpotifyUrl = d.debugSpotifyUrl;
                         }
                     }
@@ -1358,17 +1362,16 @@ if (smartLinkButton) {
             }
         }
 
-        // 3. Si llegamos aquí, tenemos un link de Spotify seguro (cargado antes o rescatado ahora)
+        // 3. Tenemos link seguro, intentar conseguir Smart Link de Odesli AHORA MISMO
+        // IMPORTANTE: linksOnly=true para activar la búsqueda en el Worker
         showNotification('Buscando enlaces disponibles...');
 
         try {
-            // Usamos el mismo endpoint para intentar conseguir Odesli
-            // Pasamos los datos actuales del DOM para asegurar coincidencia
             const artist = songArtist.textContent;
             const title = songTitle.textContent;
             const album = songAlbum.textContent.replace(/[()]/g, ''); // Limpiar paréntesis
 
-            const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&album=${encodeURIComponent(album)}`;
+            const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&album=${encodeURIComponent(album)}&linksOnly=true`;
             
             const res = await fetch(u);
             if (!res.ok) throw new Error("Error fetching Odesli");
@@ -1850,7 +1853,7 @@ if (shareWhatsApp) {
             const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
             if (isBrave) {
                 showNotification('En Brave, toca el enlace para abrir WhatsApp Web');
-                setTimeout(() => { window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank'); }, 1000);
+                setTimeout(() => { window.open(`https://wa.me/?text=${encodeURIComponent(m)`, '_blank'); }, 1000);
             } else if (isMob) {
                 const uri = `whatsapp://send?text=${encodeURIComponent(m)}`; // Corrección typo protocolo
                 const link = document.createElement('a');
