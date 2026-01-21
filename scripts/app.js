@@ -1,4 +1,4 @@
-// app.js - v4.1 (Lazy Load & Race Condition Fix)
+// app.js - v4.2 (Client-side Odesli + Lazy Load)
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm';
 
@@ -102,17 +102,11 @@ function getUserUniqueID() {
 }
 
 async function joinStation(stationId) {
-    // FIX: Chequeo inicial para evitar subscripciones dobles o nulas
     if (stationId === currentStationId) return;
-
-    // Si hay un canal activo y el ID es diferente, salir primero (limpieza atómica)
     if (currentChannel) {
         await leaveStation(currentStationId);
     }
-    
-    // Asignar ID inmediatamente para evitar race conditions con llamadas rápidas externas
     currentStationId = stationId;
-    
     const channelName = `station:${stationId}`;
     const channel = supabase.channel(channelName, {
         config: { presence: { key: getUserUniqueID() } }
@@ -122,7 +116,6 @@ async function joinStation(stationId) {
         .on('presence', { event: 'sync' }, () => {
             const state = channel.presenceState();
             const count = Object.keys(state).length;
-            
             const counterElement = document.getElementById('totalListenersValue');
             if (counterElement) {
                 const countStr = String(count).padStart(5, '0');
@@ -131,18 +124,12 @@ async function joinStation(stationId) {
         })
         .subscribe(async (status) => {
             if (status === 'SUBSCRIBED') {
-                // 1. Enviar estado inicial
                 await channel.track({
                     user_at: new Date().toISOString(),
                     agent: navigator.userAgent
                 });
 
-                // =================================================================
-                // NUEVO: SISTEMA ANTI-PAUSA (HEARTBEAT)
-                // =================================================================
-                // Esto envía una señal cada 45 segundos para mantener el proyecto activo
                 if (keepAliveInterval) clearInterval(keepAliveInterval);
-                
                 keepAliveInterval = setInterval(async () => {
                     try {
                         await channel.track({ 
@@ -152,7 +139,7 @@ async function joinStation(stationId) {
                     } catch (err) {
                         console.warn('Error enviando heartbeat:', err);
                     }
-                }, 45000); // 45000ms = 45 segundos
+                }, 45000); 
             }
         });
 
@@ -160,25 +147,20 @@ async function joinStation(stationId) {
 }
 
 async function leaveStation(stationId) {
-    // 1. Detener el Heartbeat primero
     if (keepAliveInterval) {
         clearInterval(keepAliveInterval);
         keepAliveInterval = null;
     }
-
     if (currentChannel) {
-        // FIX: Try-catch para evitar errores en consola al desconectar canales durante cambios rápidos
         try {
             await supabase.removeChannel(currentChannel);
         } catch (err) {
-            // Ignoramos errores de "WebSocket closed" durante cambios rápidos de estación
             if (!err.message.includes('closed')) {
                 console.warn('Error al dejar canal (ignorado):', err);
             }
         }
         currentChannel = null;
         currentStationId = null;
-        
         const counterElement = document.getElementById('totalListenersValue');
         if (counterElement) {
             counterElement.textContent = '00000';
@@ -240,39 +222,21 @@ function updateVolumeIconPosition() {
     volumeIcon.style.left = `${newPosition}px`;
 }
 
-// CORRECCIÓN APLICADA: updateTooltipPosition no borra el texto "--" al pasar el mouse
 function updateTooltipPosition() {
     const referenceEl = document.getElementById('trackCredits');
     const tooltipEl = document.getElementById('tooltip-credits');
-    
-    // Si no hay créditos o no están cargados, ocultamos el tooltip JS
     if (!referenceEl || !tooltipEl || currentCredits === '') {
         if(tooltipEl) tooltipEl.style.opacity = '0';
-        // No tocamos referenceEl.textContent para permitir que se mantenga 'N/A'
         return;
     }
-
-    // Configuración del tooltip
     tooltipEl.style.opacity = '0'; 
     tooltipEl.style.visibility = 'visible';
-
-    // Usar Floating UI para calcular posición arriba (Top)
     computePosition(referenceEl, tooltipEl, {
         placement: 'top',
         strategy: 'absolute',
-        middleware: [
-            offset(8),
-            flip({
-                mainAxis: true,
-                crossAxis: false
-            })
-        ]
+        middleware: [offset(8), flip({ mainAxis: true, crossAxis: false })]
     }).then(({x, y, placement}) => {
-        // Aplicar coordenadas
-        Object.assign(tooltipEl.style, {
-            left: `${x}px`,
-            top: `${y}px`,
-        });
+        Object.assign(tooltipEl.style, { left: `${x}px`, top: `${y}px` });
     });
 }
     
@@ -280,14 +244,9 @@ function updateShareButtonVisibility() {
     const title = songTitle.textContent;
     const artist = songArtist.textContent;
     if (title && artist &&
-        title !== 'a sonar' &&
-        title !== 'Conectando...' &&
-        title !== 'Seleccionar estación' &&
-        title !== 'A sonar' &&
-        title !== 'Reproduciendo...' &&
-        title !== 'Error de reproducción' &&
-        title !== 'Reconectando...' &&
-        artist !== '') {
+        title !== 'a sonar' && title !== 'Conectando...' && title !== 'Seleccionar estación' &&
+        title !== 'A sonar' && title !== 'Reproduciendo...' && title !== 'Error de reproducción' &&
+        title !== 'Reconectando...' && artist !== '') {
         shareButton.classList.add('visible');
     } else {
         shareButton.classList.remove('visible');
@@ -305,18 +264,12 @@ function showNotification(message) {
 
 function showInstallInvitation() {
     if (window.matchMedia('(display-mode: standalone)').matches || installInvitationTimeout) return;
-    
-    // FIX: Mejora de UX - Verificar si el usuario ya descartó la invitación anteriormente
     if (localStorage.getItem('rm_pwa_invite_dismissed') === 'true') return;
 
     let os = 'other';
     if (/android/i.test(navigator.userAgent)) os = 'android';
     else if (/iphone|ipad|ipod/i.test(navigator.userAgent)) os = 'ios';
     else if (/win/i.test(navigator.userAgent)) os = 'windows';
-
-    // ======================================================================
-    // FIX: Desactivar invitación "Mejorar la experiencia" en Windows
-    // ======================================================================
     if (os === 'windows') return;
 
     [installWindowsBtn, installAndroidBtn, installIosBtn].forEach(btn => btn.classList.add('disabled'));
@@ -393,10 +346,7 @@ function stopPlaybackChecks() {
 // GESTIÓN DE FAVORITOS
 // ==========================================================================
 const FAVORITES_KEY = 'radioMax_favorites';
-function getFavorites() {
-    try { return JSON.parse(localStorage.getItem(FAVORITES_KEY)) || []; }
-    catch (error) { return []; }
-}
+function getFavorites() { try { return JSON.parse(localStorage.getItem(FAVORITES_KEY)) || []; } catch (error) { return []; } }
 function saveFavorites(list) { try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(list)); } catch (e) {} }
 function updateFavoriteButtonUI(id, fav) {
     const btn = document.querySelector(`.favorite-btn[data-station-id="${id}"]`);
@@ -410,12 +360,8 @@ function updateFavoriteButtonUI(id, fav) {
         btn.setAttribute('aria-label', `Añadir ${name} a favoritos`);
     }
 }
-function addFavorite(id) {
-    let favs = getFavorites();
-    if (!favs.includes(id)) { favs.push(id); saveFavorites(favs); updateFavoriteButtonUI(id, true); showNotification('Estación añadida'); }
-}
-function removeFavorite(id) {
-    let favs = getFavorites().filter(fid => fid !== id); saveFavorites(favs); updateFavoriteButtonUI(id, false); showNotification('Estación eliminada'); }
+function addFavorite(id) { let favs = getFavorites(); if (!favs.includes(id)) { favs.push(id); saveFavorites(favs); updateFavoriteButtonUI(id, true); showNotification('Estación añadida'); } }
+function removeFavorite(id) { let favs = getFavorites().filter(fid => fid !== id); saveFavorites(favs); updateFavoriteButtonUI(id, false); showNotification('Estación eliminada'); }
 function filterStationsByFavorites() {
     const favs = getFavorites();
     document.querySelectorAll('.custom-option').forEach(opt => {
@@ -431,9 +377,7 @@ function filterStationsByFavorites() {
         label.style.display = has ? 'block' : 'none';
     });
 }
-function showAllStations() {
-    document.querySelectorAll('.custom-option, .custom-optgroup-label').forEach(el => el.style.display = '');
-}
+function showAllStations() { document.querySelectorAll('.custom-option, .custom-optgroup-label').forEach(el => el.style.display = ''); }
 
 // ==========================================================================
 // SELECTOR PERSONALIZADO
@@ -688,15 +632,11 @@ async function loadStations() {
             }
         }
 
-        // =================================================================
-        // NUEVO: AUTO-PLAY DESDE URL PARAMETERS
-        // =================================================================
         const urlParams = new URLSearchParams(window.location.search);
         const startStationId = urlParams.get('station');
         if (startStationId && stationsById[startStationId]) {
             console.log("URL detectada. Iniciando estación:", startStationId);
             stationSelect.value = startStationId;
-            // Disparar evento change para activar CustomSelect UI y playStation
             stationSelect.dispatchEvent(new Event('change'));
         }
 
@@ -780,24 +720,16 @@ if (playBtn) {
 function handlePlaybackError() {
     if (connectionManager.isReconnecting) return;
     if (!audioPlayer.paused && audioPlayer.currentTime > 0) return;
-    
-    isPlaying = false;
-    updateStatus(false);
-    audioPlayer.pause();
+    isPlaying = false; updateStatus(false); audioPlayer.pause();
     if (timeStuckCheckInterval) { clearInterval(timeStuckCheckInterval); timeStuckCheckInterval = null; }
     if (updateInterval) { clearInterval(updateInterval); updateInterval = null; }
     if (rapidCheckInterval) { clearInterval(rapidCheckInterval); rapidCheckInterval = null; }
-    currentTrackInfo = null;
-    trackDuration = 0;
-    trackStartTime = 0;
-    resetCountdown();
-    resetAlbumCover();
-    resetAlbumDetails();
+    currentTrackInfo = null; trackDuration = 0; trackStartTime = 0;
+    resetCountdown(); resetAlbumCover(); resetAlbumDetails();
     showWelcomeScreen();
     songTitle.textContent = 'Reconectando...';
     songArtist.textContent = 'La reproducción se reanudará automáticamente.';
-    songAlbum.textContent = '';
-    updateShareButtonVisibility();
+    songAlbum.textContent = ''; updateShareButtonVisibility();
     logErrorForAnalysis('Playback error', { station: currentStation ? currentStation.id : 'unknown', timestamp: new Date().toISOString(), userAgent: navigator.userAgent });
     connectionManager.start();
 }
@@ -807,13 +739,10 @@ let currentPlayPromiseId = 0;
 async function playStation() {
     if (!currentStation) { alert('Por favor, seleccionar una estación'); return; }
     const thisPlayId = ++currentPlayPromiseId;
-
     await joinStation(currentStation.id);
-
     if (updateInterval) clearInterval(updateInterval);
     if (countdownInterval) clearInterval(countdownInterval);
     if (rapidCheckInterval) clearInterval(rapidCheckInterval);
-    
     currentTrackInfo = null; trackDuration = 0; trackStartTime = 0;
     resetCountdown(); resetAlbumDetails();
     audioPlayer.src = currentStation.url;
@@ -832,12 +761,9 @@ async function playStation() {
 
     try {
         await audioPlayer.play();
-        
         if (thisPlayId !== currentPlayPromiseId) return;
-
         isPlaying = true; updateStatus(true); startTimeStuckCheck();
-        showPlaybackInfo();
-        wasPlayingBeforeFocusLoss = true;
+        showPlaybackInfo(); wasPlayingBeforeFocusLoss = true;
 
         if (currentStation.service === 'somafm') {
             updateSongInfo(true);
@@ -852,7 +778,6 @@ async function playStation() {
         setTimeout(() => { if (isPlaying) startPlaybackChecks(); }, 2000);
     } catch (error) {
         if (error.name === 'AbortError') return;
-        
         console.warn("Play rejected:", error);
         handlePlaybackError();
     }
@@ -890,23 +815,17 @@ async function updateSomaFmInfo(bypassRateLimit = false) {
                 trackStartTime = newTrack.date ? (newTrack.date * 1000)-1000 : Date.now();
                 trackDuration = 0;
                 startCountdown();
-                
-                // FIX: Generar ID y pasarlo para controlar responses antiguas
                 const fetchId = Date.now() + Math.random();
                 currentSongFetchId = fetchId;
-                
                 fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId)
                     .catch(e => console.error("Error fetchSongDetails (background):", e));
-                
                 if (rapidCheckInterval) { clearInterval(rapidCheckInterval); rapidCheckInterval = null; }
                 songTransitionDetected = true;
             }
         } else resetUI();
     } catch (e) {
         logErrorForAnalysis('SomaFM error', { error: e.message, stationId: currentStation.id, timestamp: new Date().toISOString() });
-    } finally { 
-        isUpdatingSongInfo = false; 
-    }
+    } finally { isUpdatingSongInfo = false; }
 }
 
 function startSomaFmPolling() {
@@ -919,7 +838,6 @@ async function updateRadioParadiseInfo(bypassRateLimit = false) {
     isUpdatingSongInfo = true;
     try {
         const w = 'https://core.chcs.workers.dev/radioparadise';
-        // FIX #1: ?? asegura que channelId 0 no se reemplace por 1
         const p = `api/now_playing?chan=${currentStation.channelId ?? 1}`;
         const u = `${w}?url=${encodeURIComponent(p)}`;
         const res = await fetch(u);
@@ -937,19 +855,14 @@ async function updateRadioParadiseInfo(bypassRateLimit = false) {
             if (d.song_duration && typeof d.song_duration === 'number') trackDuration = d.song_duration;
             else { trackStartTime = Date.now() - 15000; trackDuration = 0; }
             startCountdown();
-            
-            // FIX: Generar ID y pasarlo para controlar responses antiguas
             const fetchId = Date.now() + Math.random();
             currentSongFetchId = fetchId;
-
             fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId)
                 .catch(e => console.error("Error fetchSongDetails (background):", e));
         }
     } catch (e) {
         logErrorForAnalysis('Radio Paradise error', { error: e.message, stationId: currentStation.id, timestamp: new Date().toISOString() });
-    } finally { 
-        isUpdatingSongInfo = false; 
-    }
+    } finally { isUpdatingSongInfo = false; }
 }
 
 function startRadioParadisePolling() {
@@ -967,6 +880,37 @@ function startRadioParadisePolling() {
     rpLoop();
 }
 
+// =======================================================================
+// NUEVO: FUNCIÓN CLIENT-SIDE PARA ODESLI
+// =======================================================================
+async function getOdesliLinksClientSide(spotifyUrl) {
+    if (!spotifyUrl || spotifyUrl === "NO_URL") return null;
+    
+    try {
+        const apiUrl = `https://api.song.link/v1-alpha.1/links?url=${encodeURIComponent(spotifyUrl)}&userCountry=AR`;
+        const res = await fetch(apiUrl);
+        
+        if (!res.ok) {
+            // Si falla (ej 429), simplemente devolvemos null y el botón no se muestra
+            console.warn(`Odesli client-side falló: ${res.status}`);
+            return null;
+        }
+        
+        const data = await res.json();
+        if (data && data.pageUrl) {
+            return {
+                universalLink: data.pageUrl,
+                platforms: data.linksByPlatform || {}
+            };
+        }
+        return null;
+    } catch (e) {
+        console.warn("Error en petición Odesli client-side:", e);
+        return null;
+    }
+}
+// =======================================================================
+
 async function fetchSongDetails(artist, title, album, fetchId) {
     if (!artist || !title) return;
     const sA = artist.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
@@ -974,9 +918,9 @@ async function fetchSongDetails(artist, title, album, fetchId) {
     const sAl = album ? album.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "") : "";
     
     let spotifyIsrc = null;
-    // Variables para guardar los nombres limpios de Spotify
     let spotifyCleanArtist = '';
     let spotifyCleanTitle = '';
+    let spotifyUrl = '';
 
     try {
         const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(sA)}&title=${encodeURIComponent(sT)}&album=${encodeURIComponent(sAl)}`;
@@ -984,25 +928,16 @@ async function fetchSongDetails(artist, title, album, fetchId) {
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const d = await res.json();
         
-        // =================================================================
-        // FIX CRÍTICO: CONTROL DE RACE CONDITION (CAMBIO DE CANCIÓN)
-        // Si el usuario cambió de canción mientras esperábamos la respuesta,
-        // abortamos inmediatamente la actualización para evitar datos fantasma.
-        // =================================================================
         if (fetchId !== currentSongFetchId) return;
-        // =================================================================
         
-        // Solo verificamos si 'd' existe
         if (d) {
-            // 1. ACTUALIZACIÓN INMEDIATA (Lazy Load)
-            // Mostramos la portada y datos principales apenas llegan.
-            if (d.imageUrl) {
-                displayAlbumCoverFromUrl(d.imageUrl);
-            }
+            spotifyUrl = d.debugSpotifyUrl || "";
             
-            // 2. ACTUALIZACIÓN DE DETALLES Y BOTÓN SMART LINK
-            // Esta función maneja la visibilidad del botón según los datos disponibles.
-            updateAlbumDetailsWithSpotifyData(d, d.links);
+            // 1. Mostrar datos de Spotify inmediatamente
+            if (d.imageUrl) displayAlbumCoverFromUrl(d.imageUrl);
+            
+            // 2. Actualizar UI (sin enlaces por ahora)
+            updateAlbumDetailsWithSpotifyData(d, null);
 
             if (d.duration) {
               trackDuration = d.duration;
@@ -1010,24 +945,27 @@ async function fetchSongDetails(artist, title, album, fetchId) {
               const s = Math.floor(trackDuration % 60);
               totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
             }
-        
-            // Capturamos el ISRC si Spotify lo tiene
-            if (d.isrc) {
-               spotifyIsrc = d.isrc;
-            }
-        
-            // MEJORA: Guardamos el artista y título exactos de Spotify...
-            if (d.artists && Array.isArray(d.artists)) {
-              spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
-            }
-               if (d.title) {
-                  spotifyCleanTitle = d.title;
-               }
+            if (d.isrc) spotifyIsrc = d.isrc;
+            if (d.artists && Array.isArray(d.artists)) spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
+            if (d.title) spotifyCleanTitle = d.title;
         }
+
+        // 3. Llamada asíncrona a MusicBrainz (no bloquea)
+        getMusicBrainzDuration(sA, sT, sAl, spotifyIsrc, fetchId, spotifyCleanArtist, spotifyCleanTitle);
         
-        // Llamamos a MusicBrainz pasando los datos de Spotify para el rescate
-        await getMusicBrainzDuration(sA, sT, sAl, spotifyIsrc, fetchId, spotifyCleanArtist, spotifyCleanTitle);
-        
+        // 4. Llamada asíncrona a Odesli (Client-Side) - NO BLOQUEA
+        if (spotifyUrl) {
+            // No esperamos esto con await para que la UI cargue rápido
+            getOdesliLinksClientSide(spotifyUrl)
+                .then((links) => {
+                    // Verificar de nuevo por Race Condition
+                    if (links && fetchId === currentSongFetchId) {
+                        updateAlbumDetailsWithSpotifyData(d, links);
+                    }
+                })
+                .catch(e => console.error("Error fetching Odesli", e));
+        }
+
     } catch (e) {
         logErrorForAnalysis('Spotify error', { error: e.message, artist: sA, title: sT, timestamp: new Date().toISOString() });
     }
@@ -1038,25 +976,16 @@ async function fetchSongDetails(artist, title, album, fetchId) {
 // ==========================================================================
 function formatCreditsList(relations) {
     if (!relations || !Array.isArray(relations) || relations.length === 0) return null;
-
     const roleMap = {};
-
     relations.forEach(rel => {
         const role = rel.type ? translateRole(rel.type) : '';
         const name = rel.artist ? rel.artist.name : '';
-        
         if (role && name) {
-            if (!roleMap[role]) {
-                roleMap[role] = [];
-            }
-            if (!roleMap[role].includes(name)) {
-                roleMap[role].push(name);
-            }
+            if (!roleMap[role]) roleMap[role] = [];
+            if (!roleMap[role].includes(name)) roleMap[role].push(name);
         }
     });
-
     const sortedRoles = Object.keys(roleMap).sort((a, b) => a.localeCompare(b, 'es'));
-
     return sortedRoles.map(role => {
         const names = roleMap[role].join(', ');
         return `<div><b>${role}</b> ${names}</div>`;
@@ -1067,60 +996,41 @@ function formatCreditsList(relations) {
 // FUNCIÓN: getMusicBrainzDuration
 // ==========================================================================
 async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId, spotifyArtist = '', spotifyTitle = '') {
-    // Verificar ID antes de procesar la demora de 1.5s
     if (fetchId !== currentSongFetchId) return;
-
     if (!canMakeApiCall('musicBrainz')) return;
     try {
         let recordingId = null;
-
-        // --- PRIORIDAD 1: BÚSQUEDA POR ISRC ---
         if (isrc) {
             try {
                 const isrcUrl = `https://musicbrainz.org/ws/2/isrc/${isrc}?inc=artist-rels&fmt=json`;
                 const res = await fetch(isrcUrl, { headers: { 'User-Agent': 'RadioStreamingPlayer/1.0 (https://radiomax.tramax.com.ar)' } });
-                
                 if (res.ok) {
                     const data = await res.json();
                     if (data.recordings && data.recordings.length > 0) {
                         const r = data.recordings[0];
-                        
                         if (r.length && trackDuration === 0) {
                             trackDuration = Math.floor(r.length / 1000);
                             const m = Math.floor(trackDuration / 60);
                             const s = Math.floor(trackDuration % 60);
                             totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
                         }
-
                         const creditsElement = document.getElementById('trackCredits');
                         if (creditsElement && r.relations) {
                             const artistRelations = r.relations.filter(rel => rel.type && rel.artist);
                             const creditHtml = formatCreditsList(artistRelations);
-
                             if (fetchId !== currentSongFetchId) return;
-
                             if (creditHtml) {
                                 currentCredits = creditHtml;
                                 creditsElement.textContent = 'Ver detalles';
                                 creditsElement.title = creditHtml.replace(/<[^>]*>?/gm, ''); 
-                                
                                 const tooltipContent = document.getElementById('tooltip-credits-content');
-                                if (tooltipContent) {
-                                    tooltipContent.innerHTML = creditHtml;
-                                }
+                                if (tooltipContent) tooltipContent.innerHTML = creditHtml;
                             } else {
                                 if (fetchId !== currentSongFetchId) return;
-                                
-                                creditsElement.textContent = 'S/D';
-                                creditsElement.title = ''; 
-                                creditsElement.style.borderBottom = 'none';
-                                
-                                currentCredits = "";
-                                
+                                creditsElement.textContent = 'S/D'; creditsElement.title = ''; 
+                                creditsElement.style.borderBottom = 'none'; currentCredits = "";
                                 const tooltipContent = document.getElementById('tooltip-credits-content');
-                                if (tooltipContent) {
-                                    tooltipContent.innerHTML = '';
-                                }
+                                if (tooltipContent) tooltipContent.innerHTML = '';
                             }
                         }
                         return; 
@@ -1129,10 +1039,8 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
             } catch (isrcError) {}
         }
 
-        // --- PRIORIDAD 2: BÚSQUEDA POR TÍTULO ---
         const searchArtist = spotifyArtist ? spotifyArtist : artist;
         const searchTitle = spotifyTitle ? spotifyTitle : title;
-
         const cleanTitle = searchTitle.replace(/\([^)]*\)/g, '').trim();
         const searchUrl = `https://musicbrainz.org/ws/2/recording/?query=artist:"${encodeURIComponent(searchArtist)}" AND recording:"${encodeURIComponent(cleanTitle)}"&fmt=json&limit=5`;
         
@@ -1155,49 +1063,30 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
 
         if (recordingId) {
             try {
-                // =================================================================
-                // FIX CRÍTICO: Muro de Seguridad 3 (Control tras Sleep de 1.5s)
-                // Evitar actualizar UI si la canción cambió durante la espera.
-                // =================================================================
                 await new Promise(resolve => setTimeout(resolve, 1100)); 
                 if (fetchId !== currentSongFetchId) return;
-                // =================================================================
-                
                 const creditsUrl = `https://musicbrainz.org/ws/2/recording/${recordingId}?inc=artist-rels&fmt=json`;
                 const creditsRes = await fetch(creditsUrl, { headers: { 'User-Agent': 'RadioStreamingPlayer/1.0 (https://radiomax.tramax.com.ar)' } });
-                
                 if (creditsRes.ok) {
                     const creditsData = await creditsRes.json();
                     const creditsElement = document.getElementById('trackCredits');
-                    
                     if (creditsElement && creditsData.relations) {
                         const artistRelations = creditsData.relations.filter(rel => rel.type && rel.artist);
                         const creditHtml = formatCreditsList(artistRelations);
-
                         if (fetchId !== currentSongFetchId) return;
-
                         if (creditHtml) {
                             currentCredits = creditHtml;
                             creditsElement.textContent = 'Ver detalles';
                             creditsElement.title = creditHtml.replace(/<[^>]*>?/gm, '');
-                            
                             const tooltipContent = document.getElementById('tooltip-credits-content');
-                            if (tooltipContent) {
-                                tooltipContent.innerHTML = creditHtml;
-                            }
+                            if (tooltipContent) tooltipContent.innerHTML = creditHtml;
                         } else {
                             if (fetchId !== currentSongFetchId) return;
-                            
-                            creditsElement.textContent = 'S/D';
-                            creditsElement.title = ''; 
+                            creditsElement.textContent = 'S/D'; creditsElement.title = ''; 
                             creditsElement.style.borderBottom = 'none';
-
                             currentCredits = "";
-
                             const tooltipContent = document.getElementById('tooltip-credits-content');
-                            if (tooltipContent) {
-                                tooltipContent.innerHTML = '';
-                            }
+                            if (tooltipContent) tooltipContent.innerHTML = '';
                         }
                     }
                 }
@@ -1212,51 +1101,23 @@ function translateRole(role) {
     if (typeof role !== 'string') return '';
     const lowerRole = role.toLowerCase();
     const translations = {
-        'arranger': 'Arreglista',
-        'artists and repertoire': 'Artistas y repertorio',
-        'audio engineer': 'Ingeniero de sonido',
-        'bass': 'Bajo',
-        'composer': 'Compositor',
-        'creative direction': 'Dirección creativa',
-        'conductor': 'Director',
-        'co-producer': 'Coproductor',
-        'chorus master': 'Maestro de coros',
-        'drums': 'Batería',
-        'lyricist': 'Letrista',
-        'engineer': 'Ingeniero',
-        'guitar': 'Guitarra',
-        'instrument': 'Instrumentista',
-        'instrument arranger': 'Arreglos en instrumentos',
-        'instrument technician': 'Técnico de instrumento',
-        'keyboard': 'Teclados',
-        'mastering': 'Masterización',
-        'mastering engineer': 'Ingeniero de masterización',
-        'misc': 'Otros',
-        'mix': 'Mezclador',
-        'mixing engineer': 'Ingeniero de mezclado',
-        'orchestrator': 'Orquestador',
-        'performer': 'Intérprete',
-        'performing orchestra': 'Orquesta en vivo',
-        'piano': 'Piano',
-        'phonographic copyright': 'Derechos fonográficos',
-        'producer': 'Productor',
-        'programming': 'Programación',
-        'recording': 'Grabaciones',
-        'remixer': 'Remezclador',
-        'samples from artist': 'Muestras del artista',
-        'vocal': 'Vocalista',
-        'vocal arranger': 'Arreglos en voz',
-        'writer': 'Escritor'
+        'arranger': 'Arreglista', 'artists and repertoire': 'Artistas y repertorio',
+        'audio engineer': 'Ingeniero de sonido', 'bass': 'Bajo', 'composer': 'Compositor',
+        'creative direction': 'Dirección creativa', 'conductor': 'Director', 'co-producer': 'Coproductor',
+        'chorus master': 'Maestro de coros', 'drums': 'Batería', 'lyricist': 'Letrista',
+        'engineer': 'Ingeniero', 'guitar': 'Guitarra', 'instrument': 'Instrumentista',
+        'instrument arranger': 'Arreglos en instrumentos', 'instrument technician': 'Técnico de instrumento',
+        'keyboard': 'Teclados', 'mastering': 'Masterización', 'mastering engineer': 'Ingeniero de masterización',
+        'misc': 'Otros', 'mix': 'Mezclador', 'mixing engineer': 'Ingeniero de mezclado',
+        'orchestrator': 'Orquestador', 'performer': 'Intérprete', 'performing orchestra': 'Orquesta en vivo',
+        'piano': 'Piano', 'phonographic copyright': 'Derechos fonográficos', 'producer': 'Productor',
+        'programming': 'Programación', 'recording': 'Grabaciones', 'remixer': 'Remezclador',
+        'samples from artist': 'Muestras del artista', 'vocal': 'Vocalista',
+        'vocal arranger': 'Arreglos en voz', 'writer': 'Escritor'
     };
-    // Si no hay traducción específica, usamos la versión en inglés capitalizada
     return translations[lowerRole] || capitalize(role);
 }
-
-// Helper para poner mayúscula la primera letra (usado como fallback)
-function capitalize(s) {
-    if (typeof s !== 'string') return '';
-    return s.charAt(0).toUpperCase() + s.slice(1);
-}
+function capitalize(s) { if (typeof s !== 'string') return ''; return s.charAt(0).toUpperCase() + s.slice(1); }
     
 // =======================================================================
 // MODIFICACIÓN: Función actualizada para manejar Smart Links (Lazy Load)
@@ -1292,15 +1153,19 @@ function updateAlbumDetailsWithSpotifyData(d, links) {
     }
 
     // =======================================================================
-    // NUEVO: GESTIÓN DE ENLACES ODESLI (SMART LINK)
-    // El botón se muestra inediatamente si hay datos Spotify y el link está disponible.
+    // GESTIÓN DE ENLACES ODESLI (SMART LINK - LAZY LOAD)
     // =======================================================================
     if (smartLinkButton) {
+        // Si 'links' tiene datos (vino de Odesli), mostramos el botón
         if (links && links.universalLink) {
             smartLinkButton.href = links.universalLink;
             smartLinkButton.classList.add('visible');
             smartLinkButton.setAttribute('aria-label', 'Escuchar en Spotify, Apple Music u otras plataformas');
         } else {
+            // Si no hay links, ocultamos el botón.
+            // Nota: Esta función se llama dos veces:
+            // 1. Con links=null (carga inicial Spotify) -> Botón oculto
+            // 2. Con links=data (carga final Odesli) -> Botón visible
             smartLinkButton.classList.remove('visible');
         }
     }
@@ -1310,10 +1175,8 @@ function updateAlbumDetailsWithSpotifyData(d, links) {
 function updateUIWithTrackInfo(t) {
     if (songTitle.textContent !== t.title) songTitle.textContent = t.title;
     if (songArtist.textContent !== t.artist) songArtist.textContent = t.artist;
-    
     const albumText = t.album ? `(${t.album})` : '';
     if (songAlbum.textContent !== albumText) songAlbum.textContent = albumText;
-    
     updateShareButtonVisibility();
 }
     
@@ -1369,37 +1232,24 @@ function startCountdown() {
 
     function updateTimer() {
         if (!isPlaying) return; 
-
         const n = Date.now();
         const el = (n - trackStartTime) / 1000;
-        let d;
-        let displayText = '';
+        let d; let displayText = '';
         
         if (trackDuration === 0) {
             if (currentStation && (currentStation.service === 'somafm' || currentStation.service === 'radioparadise')) {
-                d = 0; 
-                animationFrameId = requestAnimationFrame(updateTimer);
-                return;
-            } else {
-                d = el;
-            }
-        } else {
-            d = trackDuration - el;
-        }
+                d = 0; animationFrameId = requestAnimationFrame(updateTimer); return;
+            } else { d = el; }
+        } else { d = trackDuration - el; }
 
         if (d < 0) {
             const elapsed = Math.abs(d);
             const m = Math.floor(elapsed / 60);
             const s = Math.floor(elapsed % 60);
             displayText = `+${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-
             const currentElapsedSecond = Math.floor(elapsed);
             
-            if (
-                currentElapsedSecond % 2 === 0 &&
-                currentElapsedSecond !== lastCheckedSecond &&
-                !isUpdatingSongInfo
-            ) {
+            if (currentElapsedSecond % 2 === 0 && currentElapsedSecond !== lastCheckedSecond && !isUpdatingSongInfo) {
                 updateSongInfo(true);
                 lastCheckedSecond = currentElapsedSecond;
             }
@@ -1408,18 +1258,12 @@ function startCountdown() {
             const s = Math.floor(d % 60);
             displayText = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
             lastCheckedSecond = -1; 
-
             if (d < 10) countdownTimer.classList.add('ending'); 
             else countdownTimer.classList.remove('ending');
         }
-
         if (displayText) countdownTimer.textContent = displayText;
-
-        if (isPlaying) {
-            animationFrameId = requestAnimationFrame(updateTimer);
-        }
+        if (isPlaying) animationFrameId = requestAnimationFrame(updateTimer);
     }
-    
     updateTimer();
 }
 
@@ -1434,17 +1278,12 @@ function resetAlbumDetails() {
     const trackCredits = document.getElementById('trackCredits');
     if (trackCredits) {
         trackCredits.textContent = '--';
-        trackCredits.title = ''; 
-        trackCredits.style.borderBottom = 'none';
+        trackCredits.title = ''; trackCredits.style.borderBottom = 'none';
     }
     currentCredits = ""; 
     const tooltipContent = document.getElementById('tooltip-credits-content');
-    if (tooltipContent) {
-        tooltipContent.textContent = '';
-    }
-    if (smartLinkButton) {
-        smartLinkButton.classList.remove('visible');
-    }
+    if (tooltipContent) tooltipContent.textContent = '';
+    if (smartLinkButton) smartLinkButton.classList.remove('visible');
 }
     
 function startSongInfoUpdates() {
@@ -1576,23 +1415,15 @@ if (audioPlayer) {
 }
 
 const connectionManager = {
-    isReconnecting: false,
-    reconnectAttempts: 0,
-    maxReconnectAttempts:5,
-    initialReconnectDelay: 1000,
-    maxReconnectDelay: 30000,
-    reconnectTimeoutId: null,
-    audioCheckInterval: null,
+    isReconnecting: false, reconnectAttempts: 0, maxReconnectAttempts:5,
+    initialReconnectDelay: 1000, maxReconnectDelay: 30000, reconnectTimeoutId: null, audioCheckInterval: null,
     start() {
         if (this.isReconnecting) return;
-        this.isReconnecting = true;
-        this.reconnectAttempts = 0;
-        this.attemptReconnect();
-        this.startAudioCheck();
+        this.isReconnecting = true; this.reconnectAttempts = 0;
+        this.attemptReconnect(); this.startAudioCheck();
     },
     stop() {
-        this.isReconnecting = false;
-        this.reconnectAttempts = 0;
+        this.isReconnecting = false; this.reconnectAttempts = 0;
         if (this.reconnectTimeoutId) { clearTimeout(this.reconnectTimeoutId); this.reconnectTimeoutId = null; }
         if (this.audioCheckInterval) { clearInterval(this.audioCheckInterval); this.audioCheckInterval = null; }
     },
@@ -1735,12 +1566,9 @@ if (shareWhatsApp) {
         const title = songTitle.textContent;
         const artist = songArtist.textContent;
         if (title && artist && title !== 'a sonar' && title !== 'Conectando...' && title !== 'Seleccionar estación') {
-            
-            // MODIFICACIÓN: Generar URL de estación
             const baseUrl = window.location.origin;
             const stationParam = currentStation ? `?station=${currentStation.id}` : '';
             const fullUrl = `${baseUrl}${stationParam}`;
-
             const m = `Escuché ${title} de ${artist} en ${fullUrl} ¡Temazo en RadioMax!`;
             const isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
@@ -1814,9 +1642,7 @@ document.addEventListener('keydown', function(event) {
             else { lastMatchIndex = 0; lastKeyPressed = key; }
             const opt = matches[lastMatchIndex];
             const id = opt.dataset.value;
-            
             if (currentStation && currentStation.id === id) return;
-
             stationSelect.value = id;
             stationSelect.dispatchEvent(new Event('change'));
             const custom = document.querySelector('.custom-select-wrapper');
@@ -1857,10 +1683,6 @@ if ('serviceWorker' in navigator) {
                     reg.waiting.postMessage({ type: 'SKIP_WAITING' }); 
                     if (un) un.style.display = 'block'; 
                 }
-                
-                // =================================================================
-                // FORZAR ACTUALIZACIÓN SIEMPRE (Windows, Android, iOS)
-                // =================================================================
                 reg.addEventListener('updatefound', () => {
                     const nw = reg.installing;
                     nw?.addEventListener('statechange', () => {
@@ -1873,10 +1695,7 @@ if ('serviceWorker' in navigator) {
             .catch(e => console.error('SW error:', e));
         
         navigator.serviceWorker.addEventListener('controllerchange', () => { 
-            if (!refreshing) { 
-                refreshing = true; 
-                window.location.reload(); 
-            } 
+            if (!refreshing) { refreshing = true; window.location.reload(); } 
         });
 
         if (btn) {
@@ -1902,7 +1721,6 @@ if (trackCredits && tooltipEl) {
         tooltipEl.style.opacity = '1';
         tooltipEl.style.visibility = 'visible';
     };
-
     const hideTooltip = () => {
         tooltipEl.style.opacity = '0';
         setTimeout(() => {
@@ -1911,7 +1729,6 @@ if (trackCredits && tooltipEl) {
             }
         }, 200); 
     };
-
     trackCredits.addEventListener('mouseenter', showTooltip);
     trackCredits.addEventListener('mouseleave', hideTooltip);
     trackCredits.addEventListener('focus', showTooltip);
