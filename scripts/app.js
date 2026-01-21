@@ -1316,6 +1316,9 @@ function updateAlbumDetailsWithSpotifyData(d, links) {
 // =======================================================================
 // NUEVO: EVENTO CLICK PARA SMART LINK (Lazy Load)
 // =======================================================================
+// =======================================================================
+// NUEVO: EVENTO CLICK PARA SMART LINK (Lazy Load + Rescue)
+// =======================================================================
 if (smartLinkButton) {
     smartLinkButton.addEventListener('click', async function(e) {
         e.preventDefault();
@@ -1326,26 +1329,56 @@ if (smartLinkButton) {
             return;
         }
 
-        // 2. Si no hay link de Spotify guardado aún (carga muy temprana), salir
+        // 2. Si no hay link de Spotify (carga lenta), intentar RESCATARLO AHORA MISMO
         if (!currentSpotifyUrl) {
-            showNotification('Cargando información de la canción...');
-            return;
+            showNotification('Buscando enlace de Spotify...');
+            
+            try {
+                // Intentamos buscarlo urgentemente usando lo que sale en pantalla
+                const artist = songArtist.textContent;
+                const title = songTitle.textContent;
+                const album = songAlbum.textContent;
+
+                if (artist && title) {
+                    const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&album=${encodeURIComponent(album)}`;
+                    const res = await fetch(u);
+                    if (res.ok) {
+                        const d = await res.json();
+                        if (d && d.external_urls && d.external_urls.spotify) {
+                            // ¡Éxito! Guardamos y continuamos el flujo normal
+                            currentSpotifyUrl = d.external_urls.spotify;
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn("No se pudo rescatar el link rápido", err);
+            }
+
+            // Si AÚN no hay link (la API falló o no encontró nada), salimos
+            if (!currentSpotifyUrl) {
+                showNotification('Aún cargando datos de la canción... Inténtalo en unos segundos');
+                return;
+            }
         }
 
-        // 3. Intentar obtener el Smart Link de Odesli bajo demanda
+        // 3. Si llegamos aquí, tenemos un link de Spotify seguro (cargado antes o rescatado ahora)
         showNotification('Buscando enlaces disponibles...');
 
         try {
-            // Usamos el mismo endpoint para obtener el objeto completo
-            // Pasamos los datos actuales del DOM
-            const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(songArtist.textContent)}&title=${encodeURIComponent(songTitle.textContent)}&album=${encodeURIComponent(songAlbum.textContent.replace(/[()]/g, ''))}`;
+            // Usamos el mismo endpoint para intentar conseguir Odesli
+            // Pasamos los datos actuales del DOM para asegurar coincidencia
+            const artist = songArtist.textContent;
+            const title = songTitle.textContent;
+            const album = songAlbum.textContent.replace(/[()]/g, ''); // Limpiar paréntesis
+
+            const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&album=${encodeURIComponent(album)}`;
             
             const res = await fetch(u);
             if (!res.ok) throw new Error("Error fetching Odesli");
             const d = await res.json();
 
             if (d && d.links && d.links.universalLink) {
-                // Éxito: Guardamos y navegamos
+                // Éxito: Guardamos en caché del botón y navegamos
                 this.dataset.odesliLink = d.links.universalLink;
                 window.open(d.links.universalLink, '_blank');
             } else {
@@ -1354,6 +1387,7 @@ if (smartLinkButton) {
         } catch (err) {
             console.warn("Error Odesli/Lazy Load, usando fallback Spotify:", err);
             // FALLBACK: Si falla (429, red, etc.), ir directo a Spotify
+            // Como ya verificamos arriba que currentSpotifyUrl existe, esto es seguro
             window.open(currentSpotifyUrl, '_blank');
         }
     });
