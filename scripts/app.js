@@ -683,32 +683,38 @@ function startRadioParadisePolling() {
 }
 
 // =======================================================================
-// LÓGICA: ODESLI ON-CLICK (NUEVO)
+// LÓGICA: ODESLI ON-CLICK (FIX: Comprobación de respuesta)
 // =======================================================================
-// Guardamos la URL actual y el enlace Odesli en memoria para el botón
 let currentSpotifyUrl = null;
 let currentSmartLink = null;
 
-// Evento Click del botón
 if (smartLinkButton) {
     smartLinkButton.addEventListener('click', async (e) => {
         e.preventDefault();
         
-        // 1. Si ya tenemos el enlace de esta sesión, abrirlo y listo
+        // 1. Si ya tenemos el enlace de esta sesión, abrirlo
         if (currentSmartLink) {
             window.open(currentSmartLink, '_blank');
             return;
         }
 
-        // 2. Si no tenemos enlace, pero tenemos Spotify URL, pedirlo a Odesli ahora
+        // 2. Si no, pedirlo al servidor
         if (currentSpotifyUrl && currentSpotifyUrl !== "NO_URL") {
             const originalText = smartLinkButton.textContent;
             smartLinkButton.textContent = "Cargando...";
             smartLinkButton.style.opacity = "0.7";
 
             try {
-                // Llamada a nuestro nuevo endpoint /odesli
+                // Añadimos parámetro _nocache para evitar cacheo agresivo si es necesario
                 const res = await fetch(`/odesli?url=${encodeURIComponent(currentSpotifyUrl)}`);
+
+                // ==================== FIX CRÍTICO AQUÍ ====================
+                // Verificamos si la respuesta es OK antes de intentar leer JSON
+                if (!res.ok) {
+                    throw new Error(`Servidor respondió con error ${res.status}`);
+                }
+                // =========================================================
+
                 const data = await res.json();
 
                 if (data.universalLink) {
@@ -719,7 +725,8 @@ if (smartLinkButton) {
                 }
             } catch (err) {
                 console.error("Error fetching Odesli:", err);
-                showNotification("Error al obtener enlaces");
+                // Mostramos un mensaje amigable
+                showNotification("No se pudo obtener el enlace (Error 404 en servidor)");
             } finally {
                 smartLinkButton.textContent = originalText;
                 smartLinkButton.style.opacity = "1";
@@ -729,8 +736,7 @@ if (smartLinkButton) {
         }
     });
 }
-// =======================================================================
-
+    
 async function fetchSongDetails(artist, title, album, fetchId) {
     if (!artist || !title) return;
     const sA = artist.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
