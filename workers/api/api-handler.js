@@ -1,9 +1,5 @@
 // workers/api/api-handler.js
-// Lógica "On-Demand": Odesli solo se consulta si el usuario hace clic
-
-// ===============================================================
-//  CONFIGURACIÓN DE ENCABEZADOS
-// ===============================================================
+// Solución Integral: Proxy On-Click
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "https://radiomax.tramax.com.ar",
@@ -43,7 +39,7 @@ function getAlbumTypeDescription(album) {
 }
 
 // ===============================================================
-//  SPOTIFY HANDLER (Solo datos básicos, sin Odesli automático)
+//  SPOTIFY HANDLER
 // ===============================================================
 async function handleSpotifyRequest(request, env, ctx) {
   try {
@@ -82,7 +78,7 @@ async function handleSpotifyRequest(request, env, ctx) {
       if (responseSpotify.ok) searchData = await responseSpotify.json();
     }
 
-    if (!searchData || searchData.tracks.items.length === 0) {
+    if (!searchData || searchData.tracks.items.length ===0) {
       const q = `track:"${title}" artist:"${artist}"`;
       responseSpotify = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=5`, { headers: { Authorization: `Bearer ${accessToken}` } });
       if (responseSpotify.ok) searchData = await responseSpotify.json();
@@ -123,8 +119,8 @@ async function handleSpotifyRequest(request, env, ctx) {
         trackNumber: null,
         albumTypeDescription: getAlbumTypeDescription(albumData),
         isrc: trackIsrc,
-        links: null, // No devolvemos links aquí para ahorrar quota
-        debugSpotifyUrl: spotifyUrl // Necesario para la petición On-Demand
+        links: null, // Links vacíos, se buscan al hacer clic
+        debugSpotifyUrl: spotifyUrl
       };
 
       if (albumData.id) {
@@ -136,7 +132,7 @@ async function handleSpotifyRequest(request, env, ctx) {
             if (fullAlbum.tracks?.items) {
               resp.totalAlbumDuration = fullAlbum.tracks.items.reduce((sum, t) => sum + t.duration_ms, 0);
               const idx = fullAlbum.tracks.items.findIndex((t) => t.id === track.id);
-              if (idx !== -1) resp.trackNumber = idx + 1;
+              if (idx !== -1) resp.trackNumber = idx +1;
             }
           }
         } catch {}
@@ -167,7 +163,7 @@ async function handleSpotifyRequest(request, env, ctx) {
 }
 
 // ===============================================================
-//  ODESLI PROXY ON-DEMAND (Solo al hacer clic)
+//  ODESLI PROXY (RUTA ON-CLICK)
 // ===============================================================
 async function handleOdesliProxyRequest(request) {
   try {
@@ -231,7 +227,7 @@ export default {
     if (url.pathname.startsWith("/spotify")) {
       response = await handleSpotifyRequest(request, env, ctx);
     } else if (url.pathname.startsWith("/odesli")) {
-      // NUEVA RUTA: Solo se ejecuta al hacer clic
+      // Ruta importante para la función On-Click
       response = await handleOdesliProxyRequest(request);
     } else if (url.pathname.startsWith("/radioparadise")) {
       response = await handleRadioParadiseRequest(request);
