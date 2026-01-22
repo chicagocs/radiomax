@@ -1,13 +1,9 @@
-// app.js - v4.5
-
-// ==========================================================================
-// IMPORTACIONES LIMPIAS (CDN)
-// ==========================================================================
+// app.js - v4.6 (Fix "Unexpected token 'catch' - Importaciones CDN corregidas)
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm';
 
 // ==========================================================================
-// CONFIGURACIÓN DE SUPABASE (Cliente nativo)
+// CONFIGURACIÓN DE SUPABASE
 // ==========================================================================
 const SUPABASE_URL = 'https://xahbzlhjolnugpbpnbmo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_G_dlO7Q6PPT7fDQCvSN5lA_mbcqtxVl';
@@ -106,7 +102,7 @@ async function joinStation(stationId) {
     }
     currentStationId = stationId;
     const channelName = `station:${stationId}`;
-    const channel = supabase.channel(channelName, { config: { presence: { key: getUserUniqueID() } } });
+    const channel = supabase.channel(channelName, { config: { presence: { key: getUserUniqueID() } });
     channel.on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
         const count = Object.keys(state).length;
@@ -170,8 +166,7 @@ function updateTooltipPosition() {
     .then(({x, y}) => { Object.assign(tooltipEl.style, { left: `${x}px`, top: `${y}px` }); });
 }
 function updateShareButtonVisibility() {
-    const title = songTitle.textContent;
-    const artist = songArtist.textContent;
+    const title = songTitle.textContent; const artist = songArtist.textContent;
     if (title && artist && title !== 'a sonar' && title !== 'Conectando...' && title !== 'Seleccionar estación' && title !== 'A sonar' && title !== 'Reproduciendo...' && title !== 'Error de reproducción' && title !== 'Reconectando...' && artist !== '') {
         shareButton.classList.add('visible');
     } else { shareButton.classList.remove('visible'); shareOptions.classList.remove('active'); }
@@ -236,7 +231,7 @@ function updateFavoriteButtonUI(id, fav) {
     if (fav) { btn.innerHTML = '★'; btn.classList.add('is-favorite'); btn.setAttribute('aria-label', `Quitar ${name} de favoritos`); }
     else { btn.innerHTML = '☆'; btn.classList.remove('is-favorite'); btn.setAttribute('aria-label', `Añadir ${name} a favoritos`); }
 }
-function addFavorite(id) { let favs = getFavorites(); if (!favs.includes(id)) { favs.push(id); saveFavorites(favs); updateFavoriteButtonUI(id, true); showNotification('Estación añadida'); } }
+function addFavorite(id) { let favs = getFavorites(); if (!favs.includes(id)) { favs.push(id); saveFavorites(favs); updateFavoriteButtonUI(id, true); showNotification('Estación añadida'); }
 function removeFavorite(id) { let favs = getFavorites().filter(fid => fid !== id); saveFavorites(favs); updateFavoriteButtonUI(id, false); showNotification('Estación eliminada'); }
 function filterStationsByFavorites() {
     const favs = getFavorites();
@@ -314,7 +309,8 @@ class CustomSelect {
         if (promos.length > 0) {
             const promosContainer = document.createElement('div'); promosContainer.className = 'station-promotions-container';
             promos.forEach(p => {
-                const link = document.createElement('a'); link.href = p.url; link.textContent = p.text; link.className = `station-promotion-link station-promotion-link-${p.type}`; link.target = '_blank'; link.rel = 'noopener noreferrer'; promosContainer.appendChild(link);
+                const link = document.createElement('a');
+                link.href = p.url; link.textContent = p.text; link.className = `station-promotion-link station-promotion-link-${p.type}`; link.target = '_blank'; link.rel = 'noopener noreferrer'; promosContainer.appendChild(link);
             });
             details.appendChild(promosContainer);
         }
@@ -326,8 +322,12 @@ class CustomSelect {
             this.toggle(); this.updateSelectedOption();
             if (!this.hasScrolledToSelection) {
                 const opt = this.customOptions.querySelector('.custom-option.selected');
-                if (opt) { setTimeout(() => opt.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50); }
-                this.hasScrolledToSelection = true;
+                if (opt) {
+                    setTimeout(() => opt.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50);
+                } else { 
+                    const opt = this.customOptions.querySelector('.custom-option.selected');
+                    if (opt) opt.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                }
             }
         });
         this.customOptions.querySelectorAll('.custom-option').forEach(opt => {
@@ -405,7 +405,7 @@ function resetAlbumCover() {
                     <circle cx="320" cy="320" r="160" />
                 </g>
                 <g transform="translate(320, 320)">
-                    <path d="M -90 -80 L -90 80 C -90 80, -60 100, -30 80 L 30 0 L 90 80 M 90 -80 L 90 80" stroke="#FF7A00" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none" filter="url(#glow)" />
+                    <path d="M -90 -80 L -90 80 C -90 80, -60 100, -30 80 L 30 0 L 90 80 M 90 80 M 90 80 L 90 80" stroke="#FF7A00" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none" filter="url(#glow)" />
                 </g>
             </svg>
         </div>
@@ -478,7 +478,9 @@ function populateStationSelect(grouped) {
     for (const n in grouped) {
         const grp = document.createElement('optgroup'); grp.label = n;
         grouped[n].forEach(s => {
-            const opt = document.createElement('option'); opt.value = s.id; stationsById[s.id] = s; grp.appendChild(opt);
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            stationsById[s.id] = s; grp.appendChild(opt);
         });
         stationSelect.appendChild(grp);
     }
@@ -551,7 +553,7 @@ async function playStation() {
     await joinStation(currentStation.id);
     if (updateInterval) clearInterval(updateInterval);
     if (countdownInterval) clearInterval(countdownInterval);
-    if (rapidCheckInterval) clearInterval(rapidCheckInterval);
+    if (rapidCheckInterval) clearInterval(rapidCheckInterval); rapidCheckInterval = null;
     currentTrackInfo = null; trackDuration = 0; trackStartTime = 0;
     resetCountdown(); resetAlbumDetails();
     audioPlayer.src = currentStation.url;
@@ -669,9 +671,11 @@ async function updateRadioParadiseInfo(bypassRateLimit = false) {
             fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId)
                 .catch(e => console.error("Error fetchSongDetails (background):", e));
                 if (rapidCheckInterval) { clearInterval(rapidCheckInterval); rapidCheckInterval = null; }
-        } catch (e) {
-            logErrorForAnalysis('Radio Paradise error', { error: e.message, stationId: currentStation.id, timestamp: new Date().toISOString() });
-        } finally { isUpdatingSongInfo = false; }
+                songTransitionDetected = true;
+        }
+    } catch (e) {
+        logErrorForAnalysis('Radio Paradise error', { error: e.message, stationId: currentStation.id, timestamp: new Date().toISOString() });
+    } finally { isUpdatingSongInfo = false; }
 }
 
 function startRadioParadisePolling() {
@@ -690,65 +694,8 @@ function startRadioParadisePolling() {
 }
 
 // =======================================================================
-// LÓGICA: ODESLI ON-CLICK (FIX: Preservar estructura HTML)
+// LÓGICA: FETCH SONG DETAILS
 // =======================================================================
-let currentSpotifyUrl = null;
-let currentSmartLink = null;
-
-if (smartLinkButton) {
-    smartLinkButton.addEventListener('click', async (e) => {
-        e.preventDefault();
-        
-        // 1. Si ya tenemos el enlace, abrirlo
-        if (currentSmartLink) {
-            window.open(currentSmartLink, '_blank');
-            return;
-        }
-
-        // 2. Si no, pedirlo al servidor
-        // IMPORTANTE: HEMOS ELIMINADO EL CACHE BUSTER PARA QUE EL CACHE DEL WORKER FUNCIONE
-        if (currentSpotifyUrl && currentSpotifyUrl !== "NO_URL") {
-            // FIX CRÍTICO: Guardamos innerHTML en lugar de textContent
-            const originalHTML = smartLinkButton.innerHTML;
-            
-            smartLinkButton.textContent = "Cargando...";
-            smartLinkButton.style.opacity = "0.7";
-
-            try {
-                // Sin cacheBuster, el Worker puede responder desde la Caché de Cloudflare
-                const res = await fetch(`https://core.chcs.workers.dev/odesli?url=${encodeURIComponent(currentSpotifyUrl)}`);
-
-                if (!res.ok) {
-                    throw new Error(`Servidor respondió con error ${res.status}`);
-                }
-
-                const data = await res.json();
-
-                if (data.universalLink) {
-                    currentSmartLink = data.universalLink;
-                    window.open(currentSmartLink, '_blank');
-                } else {
-                    showNotification("No se encontraron enlaces de streaming");
-                }
-            } catch (err) {
-                console.error("Error fetching Odesli:", err);
-                if (err.message.includes("Saturada") || err.message.includes("429")) {
-                     showNotification("Enlaces saturados momentáneamente. Intenta en unos minutos.");
-                } else {
-                     showNotification("No se pudo obtener el enlace");
-                }
-            } finally {
-                // FIX: Restauramos innerHTML en lugar de textContent
-                // Esto recupera el icono y la estructura para que el CSS oculte el texto si corresponde
-                smartLinkButton.innerHTML = originalHTML;
-                smartLinkButton.style.opacity = "1";
-            }
-        } else {
-            showNotification("Datos de Spotify no disponibles");
-        }
-    });
-}
-    
 async function fetchSongDetails(artist, title, album, fetchId) {
     if (!artist || !title) return;
     const sA = artist.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
@@ -766,22 +713,15 @@ async function fetchSongDetails(artist, title, album, fetchId) {
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const d = await res.json();
         
-        // Muro de Seguridad: Verificar ANTES de actualizar UI
         if (fetchId !== currentSongFetchId) return;
         
         if (d) {
             spotifyUrl = d.debugSpotifyUrl || "NO_URL";
             
-            // Guardamos la URL para usarla cuando hagan clic
             currentSpotifyUrl = spotifyUrl;
-            
-            // Resetear el enlace Odesli porque cambió de canción
             currentSmartLink = null;
-
-            // 1. ACTUALIZACIÓN INMEDIATA (UI)
-            if (d.imageUrl) displayAlbumCoverFromUrl(d.imageUrl);
             
-            // Llamamos a la UI pasando NULL como links (para que no busque solo al recibir Spotify)
+            if (d.imageUrl) displayAlbumCoverFromUrl(d.imageUrl);
             updateAlbumDetailsWithSpotifyData(d, null);
 
             if (d.duration) {
@@ -795,37 +735,15 @@ async function fetchSongDetails(artist, title, album, fetchId) {
             if (d.title) spotifyCleanTitle = d.title;
         }
 
-        // 2. LLAMADA ASÍNCRONA A MUSICBRAINZ (No bloquea la UI)
         getMusicBrainzDuration(sA, sT, sAl, spotifyIsrc, fetchId, spotifyCleanArtist, spotifyCleanTitle);
         
     } catch (e) {
         logErrorForAnalysis('Spotify error', { error: e.message, artist: sA, title: sT, timestamp: new Date().toISOString() });
     }
 }
-    
-// =======================================================================
-// FORMATEAR CRÉDITOS
+
 // ==========================================================================
-function formatCreditsList(relations) {
-    if (!relations || !Array.isArray(relations) || relations.length === 0) return null;
-    const roleMap = {};
-    relations.forEach(rel => {
-        const role = rel.type ? translateRole(rel.type) : '';
-        const name = rel.artist ? rel.artist.name : '';
-        if (role && name) {
-            if (!roleMap[role]) roleMap[role] = [];
-            if (!roleMap[role].includes(name)) roleMap[role].push(name);
-        }
-    });
-    const sortedRoles = Object.keys(roleMap).sort((a, b) => a.localeCompare(b, 'es'));
-    return sortedRoles.map(role => {
-        const names = roleMap[role].join(', ');
-        return `<div><b>${role}</b> ${names}</div>`;
-    }).join(''); 
-}
-    
-// ==========================================================================
-// FUNCIÓN: getMusicBrainzDuration (Integrada para evitar duplicados)
+// FUNCIÓN: getMusicBrainzDuration
 // ==========================================================================
 async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId, spotifyArtist = '', spotifyTitle = '') {
     if (fetchId !== currentSongFetchId) return;
@@ -927,6 +845,27 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
         logErrorForAnalysis('MusicBrainz error', { error: e.message, artist, title, timestamp: new Date().toISOString() });
     }
 }
+
+// =======================================================================
+// FUNCIONES: FORMATO Y TRADUCCIÓN DE CRÉDITOS
+// =======================================================================
+function formatCreditsList(relations) {
+    if (!relations || !Array.isArray(relations) || relations.length === 0) return null;
+    const roleMap = {};
+    relations.forEach(rel => {
+        const role = rel.type ? translateRole(rel.type) : '';
+        const name = rel.artist ? rel.artist.name : '';
+        if (role && name) {
+            if (!roleMap[role]) roleMap[role] = [];
+            if (!roleMap[role].includes(name)) roleMap[role].push(name);
+        }
+    });
+    const sortedRoles = Object.keys(roleMap).sort((a, b) => a.localeCompare(b, 'es'));
+    return sortedRoles.map(role => {
+        const names = roleMap[role].join(', ');
+        return `<div><b>${role}</b> ${names}</div>`;
+    }).join(''); 
+}
     
 function translateRole(role) {
     if (typeof role !== 'string') return '';
@@ -983,18 +922,17 @@ function updateAlbumDetailsWithSpotifyData(d, links) {
         else trackIsrc.textContent = '----';
     }
 
-    // =======================================================================
     // GESTIÓN BOTÓN SMARTLINK (SIEMPRE VISIBLE SI HAY DATOS SPOTIFY)
     // =======================================================================
     if (smartLinkButton) {
-        // Asumimos que si tenemos datos de Spotify, el botón es útil.
-        // El usuario buscará el link al hacer clic.
         smartLinkButton.classList.add('visible');
         smartLinkButton.setAttribute('aria-label', 'Obtener enlaces de esta canción');
     }
 }
-// =======================================================================
 
+// =======================================================================
+// UI PRINCIPAL
+// =======================================================================
 function updateUIWithTrackInfo(t) {
     if (songTitle.textContent !== t.title) songTitle.textContent = t.title;
     if (songArtist.textContent !== t.artist) songArtist.textContent = t.artist;
@@ -1002,7 +940,7 @@ function updateUIWithTrackInfo(t) {
     if (songAlbum.textContent !== albumText) songAlbum.textContent = albumText;
     updateShareButtonVisibility();
 }
-    
+
 function resetUI() {
     if (connectionManager.isReconnecting) return;
     songTitle.textContent = 'Reproduciendo...';
@@ -1070,7 +1008,7 @@ function startCountdown() {
             const s = Math.floor(elapsed % 60);
             displayText = `+${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
             const currentElapsedSecond = Math.floor(elapsed);
-            
+
             if (currentElapsedSecond % 2 === 0 && currentElapsedSecond !== lastCheckedSecond && !isUpdatingSongInfo) {
                 updateSongInfo(true);
                 lastCheckedSecond = currentElapsedSecond;
@@ -1078,10 +1016,10 @@ function startCountdown() {
         } else {
             const m = Math.floor(d / 60);
             const s = Math.floor(d % 60);
-            displayText = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            displayText = `+${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
             lastCheckedSecond = -1; 
             if (d < 10) countdownTimer.classList.add('ending'); 
-            else countdownTimer.classList.remove('ending'); 
+            else countdownTimer.classList.remove('ending');
         }
         if (displayText) countdownTimer.textContent = displayText;
         if (isPlaying) animationFrameId = requestAnimationFrame(updateTimer);
@@ -1105,7 +1043,6 @@ function resetAlbumDetails() {
         const tooltipContent = document.getElementById('tooltip-credits-content');
         if (tooltipContent) tooltipContent.textContent = '';
     }
-    
     if (smartLinkButton) smartLinkButton.classList.remove('visible');
     currentSpotifyUrl = null;
     currentSmartLink = null;
@@ -1122,7 +1059,7 @@ function stopSongInfoUpdates() {
     if (rapidCheckInterval) { clearInterval(rapidCheckInterval); rapidCheckInterval = null; }
     resetCountdown(); resetAlbumCover(); resetAlbumDetails();
     currentTrackInfo = null;
-    songTitle.textContent = 'Seleccionar estación';
+    songTitle.textContent = 'Seleccionar Estación';
     songArtist.textContent = ''; songAlbum.textContent = '';
     updateShareButtonVisibility();
 }
@@ -1153,7 +1090,7 @@ if (audioPlayer) {
                         audioPlayer.play().then(() => {
                             isPlaying = true; updateStatus(true); startTimeStuckCheck();
                             showNotification('Reproducción reanudada automáticamente');
-                            showNotification('Reproducción reanudada automáticamente'); 
+                            showNotification('Reproducción reanudada automáticamente');
                             showNotification('Reproducción reanudada automáticamente');
                         }).catch(er => {
                             showNotification('Toca para reanudar');
@@ -1188,43 +1125,14 @@ if (audioPlayer) {
             wasPlayingBeforeFocusLoss = true;
             setTimeout(() => {
                 if (wasPlayingBeforeFocusLoss && currentStation) {
-                    audioPlayer.play().then(() => { isPlaying = true; updateStatus(true); startTimeStuckCheck(); }).catch(e => {});
-                }
-            }, 2000);
+                    audioPlayer.play().then(() => { isPlaying = true; updateStatus(true); startTimeStuckCheck(); })
+                        .catch(e => console.error("Error fetchSongDetails (background):", e)); 
+                        // Notificamos que no se pudo recuperar la sesión
+                        showNotification('Error al cargar detalles (Fallo de red)';
+                    }
+                }, 2000);
         }
     });
-}
-
-if (volumeSlider) {
-    volumeSlider.addEventListener('input', function() {
-        const v = this.value / 100;
-        audioPlayer.volume = v;
-        updateVolumeIconPosition();
-        if (this.value == 0) { volumeIcon.classList.add('muted'); isMuted = true; }
-        else { volumeIcon.classList.remove('muted'); isMuted = false; previousVolume = this.value; }
-        else { volumeIcon.classList.remove('muted'); isMuted = false; previousVolume = this.value; }
-        updateVolumeIconPosition();
-    });
-}
-
-if (volumeIcon) {
-    volumeIcon.addEventListener('click', function() {
-        if (isMuted) {
-            volumeSlider.value = previousVolume;
-            audioPlayer.volume = previousVolume / 100;
-            volumeIcon.classList.remove('muted'); isMuted = false;
-        } else {
-            previousVolume = volumeSlider.value;
-            volumeSlider.value = 0;
-            audioPlayer.volume = 0;
-            volumeIcon.classList.add('muted'); isMuted = true;
-        }
-        updateVolumeIconPosition();
-    });
-}
-
-function updateStatus(now) {
-    if (playBtn) { playBtn.textContent = now ? '⏸ PAUSAR' : '▶ SONAR'; }
 }
 
 if (audioPlayer) {
@@ -1244,7 +1152,7 @@ if (audioPlayer) {
     audioPlayer.addEventListener('ended', () => { isPlaying = false; updateStatus(false); wasPlayingBeforeFocusLoss = false; });
 }
 
-const connectionManager = {
+if (connectionManager) {
     isReconnecting: false, reconnectAttempts: 0, maxReconnectAttempts:5,
     initialReconnectDelay: 1000, maxReconnectDelay: 30000, reconnectTimeoutId: null, audioCheckInterval: null,
     start() {
@@ -1265,9 +1173,10 @@ const connectionManager = {
                 showNotification('Conexión restaurada con éxito.');
                 if (currentStation && currentStation.service !== 'nrk') {
                     if (currentStation.service === 'somafm') startSomaFmPolling();
-                    else if (currentStation.service === 'radioparadise') startRadioParadisePolling();
-                    else startSongInfoUpdates();
-                    updateSongInfo(true);
+                        else if (currentStation.service === 'radioparadise') startRadioParadisePolling();
+                        else startSongInfoUpdates();
+                        updateSongInfo(true);
+                    }
                 }
             }
         }, 1000);
@@ -1278,7 +1187,8 @@ const connectionManager = {
             songTitle.textContent = 'Error de conexión: no se pudo restaurar';
             songArtist.textContent = 'Presionar SONAR para intentar manualmente';
             songAlbum.textContent = ''; updateShareButtonVisibility();
-            this.stop(); return;
+            this.stop();
+            return;
         }
         this.reconnectAttempts++;
         const d = Math.min(this.initialReconnectDelay * Math.pow(2, this.reconnectAttempts - 1), this.maxReconnectDelay);
@@ -1290,12 +1200,12 @@ const connectionManager = {
                 showPlaybackInfo();
                 this.stop();
                 showNotification('Conexión restaurada con éxito.');
-                if (currentStation && currentStation.service !== 'nrk') {
+                if (currentStation.service !== 'nrk') {
                     if (currentStation.service === 'somafm') startSomaFmPolling();
-                    else if (currentStation.service === 'radioparadise') startRadioParadisePolling();
-                    else startSongInfoUpdates();
-                    updateSongInfo(true);
-                }
+                        else if (currentStation.service === 'radioparadise') startRadioParadisePolling();
+                        else startSongInfoUpdates();
+                        updateSongInfo(true);
+                    }
             } catch (e) { this.attemptReconnect(); }
         }, d);
     }
@@ -1324,7 +1234,7 @@ document.addEventListener('visibilitychange', () => {
             setTimeout(() => {
                 facebookVideoDetected = false;
                 if (pageFocusCheckInterval) { clearInterval(pageFocusCheckInterval); pageFocusCheckInterval = null; }
-                }, 30000);
+            }, 30000);
         }
     }
 });
@@ -1352,10 +1262,8 @@ window.addEventListener('focus', () => {
 document.addEventListener('click', () => {
     if (wasPlayingBeforeFocusLoss && !isPlaying && currentStation) {
         setTimeout(() => {
-            if (wasPlayingBeforeFocusLoss && !isPlaying && currentStation) {
-                attemptResumePlayback();
-            }, 500);
-        }
+            if (wasPlayingBeforeFocusLoss && !isPlaying && currentStation) attemptResumePlayback();
+        }, 500);
     }
 });
 
@@ -1401,7 +1309,7 @@ if (shareWhatsApp) {
     shareWhatsApp.addEventListener('click', () => {
         const title = songTitle.textContent;
         const artist = songArtist.textContent;
-        if (title && artist && title !== 'a sonar' && title !== 'Conectando...' && title !== 'Seleccionar estación') && title !== 'A sonar' && title !== 'Reproduciendo...' && title !== 'Error de reproducción' && title !== 'Reconectando...' && artist !== '') {
+        if (title && artist && title !== 'a sonar' && title !== 'Conectando...' && title !== 'Seleccionar estación' && title !== 'A sonar' && title !== 'Reproduciendo...' && title !== 'Error de reproducción' && title !== 'Reconectando...' && artist !== '') {
             const baseUrl = window.location.origin;
             const stationParam = currentStation ? `?station=${currentStation.id}` : '';
             const fullUrl = `${baseUrl}${stationParam}`;
@@ -1410,7 +1318,7 @@ if (shareWhatsApp) {
             const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
             if (isBrave) {
                 showNotification('En Brave, toca el enlace para abrir WhatsApp Web');
-                setTimeout(() => { window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank'); }, 1000);
+                setTimeout(() => { window.open(`https://wa.me/?text=${encodeURIComponent(m)`, '_blank'); }, 1000);
             } else if (isMob) {
                 const uri = `whatsapp://send?text=${encodeURIComponent(m)}`; 
                 const link = document.createElement('a');
@@ -1435,7 +1343,7 @@ if (installWindowsBtn) {
                 deferredPrompt = null;
             });
             hideInstallInvitation();
-        } else showNotification('Para instalar, usa el menú del navegador y busca "Añadir a pantalla de inicio"');
+        } else showNotification("Para instalar, usa el menú del navegador y busca \"Añadir a pantalla de inicio\"");
     });
 }
 
@@ -1449,12 +1357,12 @@ if (installAndroidBtn) {
                 deferredPrompt = null;
             });
             hideInstallInvitation();
-        } else showNotification('Para instalar, usa el menú del navegador y busca "Añadir a pantalla de inicio"');
+        } else showNotification("Para instalar, usa el menú del navegador y busca \"Añadir a pantalla de inicio\"");
     });
 }
 
 if (installIosBtn) {
-    installPwaBtnIos.addEventListener('click', (e) => {
+    installIosBtn.addEventListener('click', (e) => {
         e.preventDefault();
         showNotification('Para instalar en iOS: Pulsa el botón <strong>Compartir</strong> y luego <strong>Añadir a pantalla de inicio</strong>.');
         hideInstallInvitation();
@@ -1474,7 +1382,7 @@ document.addEventListener('keydown', function(event) {
             if (name.startsWith(key)) matches.push(opt);
         });
         if (matches.length > 0) {
-            if (key === lastKeyPressed) { lastMatchIndex = (lastMatchIndex +1) % matches.length; }
+            if (key === lastKeyPressed) { lastMatchIndex = (lastMatchIndex + 1) % matches.length; }
             else { lastMatchIndex = 0; lastKeyPressed = key; }
             const opt = matches[lastMatchIndex];
             const id = opt.dataset.value;
@@ -1485,7 +1393,7 @@ document.addEventListener('keydown', function(event) {
             const trig = custom.querySelector('.custom-select-trigger');
             const st = stationsById[id];
             let txt = st.name;
-            if (st.service === 'radioparadise') txt = st.name.split(' - ')[1] || st.name || '';
+            if (st.service === 'radioparadise') txt = st.name.split(' - ')[1] || st.name : st.name;
             trig.textContent = txt;
             custom.querySelectorAll('.custom-option').forEach(o => o.classList.remove('selected'));
             opt.classList.add('selected');
@@ -1528,22 +1436,22 @@ if ('serviceWorker' in navigator) {
                     });
                 });
             })
-            .catch(e => console.error('SW error:', e));
-        
+            .catch(e) { console.error('SW error:', e); });
+
         navigator.serviceWorker.addEventListener('controllerchange', () => { 
             if (!refreshing) { refreshing = true; window.location.reload(); } 
         });
 
         if (btn) {
             btn.addEventListener('click', () => {
-                if (un) un.style.display = 'none';
+                if (un) { un.style.display = 'none'; un.style.display = 'none'; un.style.display = 'none';
                 navigator.serviceWorker.controller?.postMessage({ type: 'SKIP_WAITING' });
                 setTimeout(() => window.location.reload(), 100);
             });
         }
     });
 }
-   
+
 // =======================================================================
 // INTERACCIÓN DE TOOLTIP (Floating UI)
 // =======================================================================
@@ -1568,7 +1476,7 @@ if (trackCredits && tooltipEl) {
     trackCredits.addEventListener('mouseenter', showTooltip);
     trackCredits.addEventListener('mouseleave', hideTooltip);
     trackCredits.addEventListener('focus', showTooltip);
-    trackCredits.addEventListener('blur', hideTooltip');
+    trackCredits.addEventListener('blur', hideTooltip);
 }
 
 // =======================================================================
