@@ -1,4 +1,4 @@
-// app.js - v4.7
+// app.js - v4.9 (Final Fix: Service Worker Promise Chain, Template Literals, Safe Blocks)
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm';
 
@@ -243,13 +243,11 @@ document.addEventListener('DOMContentLoaded', () => {
         function showNotification(message) {
             if (notification) { notification.textContent = message; notification.classList.add('show'); setTimeout(() => { notification.classList.remove('show'); }, 3000); }
         }
-        // FIX: Función faltante añadida
         function updateStatus(playing) {
             if (!playBtn) return;
             if (playing) {
                 playBtn.classList.add('playing');
                 playBtn.classList.remove('paused');
-                // Asumimos que hay lógica CSS para manejar el icono
             } else {
                 playBtn.classList.remove('playing');
                 playBtn.classList.add('paused');
@@ -816,7 +814,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (d.title) spotifyCleanTitle = d.title;
                 }
 
-                getMusicBrainzDuration(sA, sT, sAl, spotifyIsrc, fetchId, spotifyCleanArtist, spotifyCleanTitle);
+                // Llamada segura con argumentos separados
+                getMusicBrainzDuration(
+                    sA, 
+                    sT, 
+                    sAl, 
+                    spotifyIsrc, 
+                    fetchId, 
+                    spotifyCleanArtist, 
+                    spotifyCleanTitle
+                );
                 
             } catch (e) {
                 logErrorForAnalysis('Spotify error', { error: e.message, artist: sA, title: sT, timestamp: new Date().toISOString() });
@@ -971,7 +978,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function capitalize(s) { if (typeof s !== 'string') return ''; return s.charAt(0).toUpperCase() + s.slice(1); }
             
         // =======================================================================
-        // MODIFICACIÓN: updateAlbumDetailsWithSpotifyData
+        // MODIFICACIÓN: updateAlbumDetailsWithSpotifyData (Safe Blocks)
         // =======================================================================
         function updateAlbumDetailsWithSpotifyData(d, links) {
             const el = document.getElementById('releaseDate');
@@ -979,12 +986,23 @@ document.addEventListener('DOMContentLoaded', () => {
             if (d.release_date) {
                 const y = d.release_date.substring(0, 4);
                 let t = y;
-                if (d.albumTypeDescription && d.albumTypeDescription !== 'Álbum') t += ` (${d.albumTypeDescription})`;
+                if (d.albumTypeDescription && d.albumTypeDescription !== 'Álbum') {
+                    t += ` (${d.albumTypeDescription})`;
+                }
                 el.textContent = t;
             } else if (el) el.textContent = '----';
             
-            if (d.label && d.label.trim() !== '') recordLabel.textContent = d.label; else recordLabel.textContent = '----';
-            if (d.totalTracks) albumTrackCount.textContent = d.totalTracks; else albumTrackCount.textContent = '--';
+            if (d.label && d.label.trim() !== '') {
+                recordLabel.textContent = d.label;
+            } else {
+                recordLabel.textContent = '----';
+            }
+
+            if (d.totalTracks) {
+                albumTrackCount.textContent = d.totalTracks;
+            } else {
+                albumTrackCount.textContent = '--';
+            }
             
             if (d.totalAlbumDuration) {
                 let s = d.totalAlbumDuration;
@@ -992,15 +1010,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 const m = Math.floor(s / 60);
                 const sec = Math.floor(s % 60);
                 albumTotalDuration.textContent = `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-            } else albumTotalDuration.textContent = '--:--';
+            } else {
+                albumTotalDuration.textContent = '--:--';
+            }
             
-            if (d.genres && d.genres.length > 0) trackGenre.textContent = d.genres.slice(0, 2).join(', '); else trackGenre.textContent = '--';
+            // FIX: Separated if/else blocks to avoid syntax confusion
+            if (d.genres && d.genres.length > 0) {
+                trackGenre.textContent = d.genres.slice(0, 2).join(', ');
+            } else {
+                trackGenre.textContent = '--';
+            }
             
-            if (d.trackNumber && d.totalTracks) trackPosition.textContent = `Track ${d.trackNumber}/${d.totalTracks}`; else trackPosition.textContent = '--/--';
+            // FIX: Separated if/else blocks
+            if (d.trackNumber && d.totalTracks) {
+                trackPosition.textContent = `Track ${d.trackNumber}/${d.totalTracks}`;
+            } else {
+                trackPosition.textContent = '--/--';
+            }
             
             if (trackIsrc) {
-                if (d.isrc && d.isrc.trim() !== '') trackIsrc.textContent = d.isrc.toUpperCase(); 
-                else trackIsrc.textContent = '----';
+                if (d.isrc && d.isrc.trim() !== '') {
+                    trackIsrc.textContent = d.isrc.toUpperCase(); 
+                } else {
+                    trackIsrc.textContent = '----';
+                }
             }
 
             // GESTIÓN BOTÓN SMARTLINK (SIEMPRE VISIBLE SI HAY DATOS SPOTIFY)
@@ -1336,7 +1369,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const baseUrl = window.location.origin;
                     const stationParam = currentStation ? '?station=' + currentStation.id : '';
                     const fullUrl = baseUrl + stationParam;
-                    const mensaje = 'Escuche ' + title + ' de ' + artist + ' en ' + fullUrl + ' - Temazo en RadioMax';
+                    // FIX: Template literal para evitar errores de comas en concatenación
+                    const mensaje = `Escuche ${title} de ${artist} en ${fullUrl} - Temazo en RadioMax`;
                     const isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
                     const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
                     if (isBrave) {
@@ -1454,16 +1488,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 .catch(e => { console.error('Error loading sw version:', e); versionSpan.textContent = 'Error'; });
         }
 
+        // =======================================================================
+        // SERVICE WORKER: Promise Chain (Evita errores de async/await anidado)
+        // =======================================================================
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 let refreshing = false;
                 const un = document.getElementById('update-notification');
                 const btn = document.getElementById('update-reload-btn');
-                
-                const registerSW = async () => {
-                    try {
-                        const reg = await navigator.serviceWorker.register('/sw.js');
-                        
+
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => {
                         if (reg.waiting) { 
                             reg.waiting.postMessage({ type: 'SKIP_WAITING' }); 
                             if (un) un.style.display = 'block'; 
@@ -1478,12 +1513,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 });
                             }
                         });
-                    } catch (e) {
-                        console.error('SW registration failed:', e);
-                    }
-                };
-
-                registerSW();
+                    })
+                    .catch(e => { console.error('SW error:', e); });
 
                 navigator.serviceWorker.addEventListener('controllerchange', () => { 
                     if (!refreshing) { refreshing = true; window.location.reload(); } 
