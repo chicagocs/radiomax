@@ -86,6 +86,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let songTransitionDetected = false;
         let isUpdatingSongInfo = false;
         let currentCredits = "";
+        let currentSpotifyUrl = null;
+        let currentSmartLink = null;
         const RAPID_CHECK_THRESHOLD = 150;
         audioPlayer.volume = 0.5;
 
