@@ -1308,9 +1308,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         setTimeout(showInstallPwaButtons, 1000);
 
-        if (shareButton) { shareButton.addEventListener('click', () => { shareOptions.classList.toggle('active'); });
-        document.addEventListener('click', (e) => { if (shareButton && shareOptions && !shareButton.contains(e.target) && !shareOptions.contains(e.target)) shareOptions.classList.remove('active'); });
-        }
+if (shareButton) { 
+    shareButton.addEventListener('click', () => { 
+        shareOptions.classList.toggle('active'); 
+    });
+    document.addEventListener('click', (e) => { 
+        if (shareButton && shareOptions && !shareButton.contains(e.target) && !shareOptions.contains(e.target)) 
+            shareOptions.classList.remove('active'); 
+    });
+}
         
         if (shareWhatsApp) {
             shareWhatsApp.addEventListener('click', () => {
