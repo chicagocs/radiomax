@@ -1255,19 +1255,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         window.addEventListener('focus', () => {
-            attemptResumePlayback();
-            if (facebookVideoDetected) {
-                startFacebookDetection();
-                // FIX: Añadido paréntesis de cierre y delay para corregir el error de sintaxis
-                setTimeout(() => {
-                    facebookVideoDetected = false;
-                    if (pageFocusCheckInterval) { clearInterval(pageFocusCheckInterval); pageFocusCheckInterval = null; }
-                    setTimeout(() => {
-                        facebookVideoDetected = false;
-                        if (pageFocusCheckInterval) { clearInterval(pageFocusCheckInterval); pageFocusCheckInterval = null; }
-                    }, 30000);
-                }, 30000);
-            }
+           attemptResumePlayback();
+        if (facebookVideoDetected) {
+           startFacebookDetection();
+           setTimeout(() => {
+            facebookVideoDetected = false;
+            if (pageFocusCheckInterval) { clearInterval(pageFocusCheckInterval); pageFocusCheckInterval = null; }
+            }, 30000);
+        }
         });
 
         document.addEventListener('click', () => {
@@ -1454,16 +1449,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!refreshing) { refreshing = true; window.location.reload(); } 
                 });
 
-                if (btn) {
-                    btn.addEventListener('click', () => {
-                        if (un) { un.style.display = 'none'; un.style.display = 'none'; un.style.display = 'none';
-                        navigator.serviceWorker.controller?.postMessage({ type: 'SKIP_WAITING' });
-                        setTimeout(() => window.location.reload(), 100);
-                    });
-                }
-            });
+        if (btn) {
+        btn.addEventListener('click', () => {
+        if (un) { 
+            un.style.display = 'none';
         }
-
+        navigator.serviceWorker.controller?.postMessage({ type: 'SKIP_WAITING' });
+        setTimeout(() => window.location.reload(), 100);
+        });
+        }
+                
         // =======================================================================
         // INTERACCIÓN DE TOOLTIP (Floating UI)
         // =======================================================================
