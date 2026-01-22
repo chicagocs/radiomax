@@ -1,4 +1,4 @@
-// app.js - v4.6 (Fix "Unexpected token 'catch' - Importaciones CDN corregidas)
+// app.js - v4.7
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm';
 
@@ -91,6 +91,7 @@ audioPlayer.volume = 0.5;
 // FUNCIONES: SUPABASE PRESENCE
 // ==========================================================================
 function getUserUniqueID() {
+    // FIX: Usar clave local dentro de la función para seguridad
     let uid = localStorage.getItem('rm_uid');
     if (!uid) { uid = 'user_' + Math.random().toString(36).substr(2, 9); localStorage.setItem('rm_uid', uid); }
     return uid;
@@ -166,7 +167,8 @@ function updateTooltipPosition() {
     .then(({x, y}) => { Object.assign(tooltipEl.style, { left: `${x}px`, top: `${y}px` }); });
 }
 function updateShareButtonVisibility() {
-    const title = songTitle.textContent; const artist = songArtist.textContent;
+    const title = songTitle.textContent;
+    const artist = songArtist.textContent;
     if (title && artist && title !== 'a sonar' && title !== 'Conectando...' && title !== 'Seleccionar estación' && title !== 'A sonar' && title !== 'Reproduciendo...' && title !== 'Error de reproducción' && title !== 'Reconectando...' && artist !== '') {
         shareButton.classList.add('visible');
     } else { shareButton.classList.remove('visible'); shareOptions.classList.remove('active'); }
@@ -182,7 +184,7 @@ function showInstallInvitation() {
     if (os === 'windows') return;
     [installWindowsBtn, installAndroidBtn, installIosBtn].forEach(btn => btn.classList.add('disabled'));
     const activeBtn = os === 'android' ? installAndroidBtn : (os === 'ios' ? installIosBtn : (os === 'windows' ? installWindowsBtn : null));
-    if(activeBtn) activeBtn.classList.remove('disabled');
+    if (activeBtn) activeBtn.classList.remove('disabled');
     installPwaInvitation.style.display = 'flex'; installInvitationTimeout = true;
 }
 function hideInstallInvitation() { installPwaInvitation.style.display = 'none'; localStorage.setItem('rm_pwa_invite_dismissed', 'true'); }
@@ -190,8 +192,13 @@ function attemptResumePlayback() {
     if (wasPlayingBeforeFocusLoss && !isPlaying && currentStation) {
         setTimeout(() => {
             if (!isPlaying) {
-                audioPlayer.play().then(() => { isPlaying = true; updateStatus(true); startTimeStuckCheck(); showNotification('Reproducción reanudada automáticamente'); })
-                .catch(error => { showNotification('Toca para reanudar'); playBtn.style.animation = 'pulse 2s infinite'; });
+                audioPlayer.play().then(() => {
+                    isPlaying = true; updateStatus(true); startTimeStuckCheck();
+                    showNotification('Reproducción reanudada automáticamente');
+                }).catch(error => {
+                    showNotification('Toca para reanudar');
+                    playBtn.style.animation = 'pulse 2s infinite';
+                });
             }
         }, 1000);
     }
@@ -309,8 +316,8 @@ class CustomSelect {
         if (promos.length > 0) {
             const promosContainer = document.createElement('div'); promosContainer.className = 'station-promotions-container';
             promos.forEach(p => {
-                const link = document.createElement('a');
-                link.href = p.url; link.textContent = p.text; link.className = `station-promotion-link station-promotion-link-${p.type}`; link.target = '_blank'; link.rel = 'noopener noreferrer'; promosContainer.appendChild(link);
+                const link = document.createElement('a'); link.href = p.url; link.textContent = p.text; link.className = `station-promotion-link station-promotion-link-${p.type}`; link.target = '_blank'; link.rel = 'noopener noreferrer';
+                promosContainer.appendChild(link);
             });
             details.appendChild(promosContainer);
         }
@@ -322,12 +329,8 @@ class CustomSelect {
             this.toggle(); this.updateSelectedOption();
             if (!this.hasScrolledToSelection) {
                 const opt = this.customOptions.querySelector('.custom-option.selected');
-                if (opt) {
-                    setTimeout(() => opt.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50);
-                } else { 
-                    const opt = this.customOptions.querySelector('.custom-option.selected');
-                    if (opt) opt.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                }
+                if (opt) { setTimeout(() => opt.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50); }
+                this.hasScrolledToSelection = true;
             }
         });
         this.customOptions.querySelectorAll('.custom-option').forEach(opt => {
@@ -405,7 +408,7 @@ function resetAlbumCover() {
                     <circle cx="320" cy="320" r="160" />
                 </g>
                 <g transform="translate(320, 320)">
-                    <path d="M -90 -80 L -90 80 C -90 80, -60 100, -30 80 L 30 0 L 90 80 M 90 80 M 90 80 L 90 80" stroke="#FF7A00" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none" filter="url(#glow)" />
+                    <path d="M -90 -80 L -90 80 C -90 80, -60 100, -30 80 L 30 0 L 90 80 M 90 80 M 90 -80 L 90 80" stroke="#FF7A00" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none" filter="url(#glow)" />
                 </g>
             </svg>
         </div>
@@ -472,15 +475,13 @@ async function loadStations() {
 function populateStationSelect(grouped) {
     while (stationSelect.firstChild) stationSelect.removeChild(stationSelect.firstChild);
     const def = document.createElement('option');
-    def.value = ""; def.textContent = " Seleccionar Estación "; def.disabled = true; def.selected = true;
+    def.value = ""; def.textContent = " Seleccionar Estación "; def.disabled = true; def.selected = true; def.style.color = 'black';
     stationSelect.appendChild(def);
     stationsById = {};
     for (const n in grouped) {
         const grp = document.createElement('optgroup'); grp.label = n;
         grouped[n].forEach(s => {
-            const opt = document.createElement('option');
-            opt.value = s.id;
-            stationsById[s.id] = s; grp.appendChild(opt);
+            const opt = document.createElement('option'); opt.value = s.id; stationsById[s.id] = s; grp.appendChild(opt);
         });
         stationSelect.appendChild(grp);
     }
@@ -552,14 +553,13 @@ async function playStation() {
     const thisPlayId = ++currentPlayPromiseId;
     await joinStation(currentStation.id);
     if (updateInterval) clearInterval(updateInterval);
-    if (countdownInterval) clearInterval(countdownInterval);
-    if (rapidCheckInterval) clearInterval(rapidCheckInterval); rapidCheckInterval = null;
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+    if (rapidCheckInterval) { clearInterval(rapidCheckInterval); rapidCheckInterval = null; }
     currentTrackInfo = null; trackDuration = 0; trackStartTime = 0;
     resetCountdown(); resetAlbumDetails();
     audioPlayer.src = currentStation.url;
     songTitle.textContent = 'Conectando...';
-    songArtist.textContent = ''; songAlbum.textContent = '';
-    resetAlbumCover(); updateShareButtonVisibility();
+    songArtist.textContent = ''; songAlbum.textContent = ''; resetAlbumCover(); updateShareButtonVisibility();
 
     if (currentStation.service === 'nrk') {
         audioPlayer.addEventListener('loadedmetadata', () => {
@@ -672,7 +672,7 @@ async function updateRadioParadiseInfo(bypassRateLimit = false) {
                 .catch(e => console.error("Error fetchSongDetails (background):", e));
                 if (rapidCheckInterval) { clearInterval(rapidCheckInterval); rapidCheckInterval = null; }
                 songTransitionDetected = true;
-        }
+        } else resetUI();
     } catch (e) {
         logErrorForAnalysis('Radio Paradise error', { error: e.message, stationId: currentStation.id, timestamp: new Date().toISOString() });
     } finally { isUpdatingSongInfo = false; }
@@ -694,8 +694,67 @@ function startRadioParadisePolling() {
 }
 
 // =======================================================================
-// LÓGICA: FETCH SONG DETAILS
+// LÓGICA: ODESLI ON-CLICK (FIX: Preservar estructura HTML)
 // =======================================================================
+let currentSpotifyUrl = null;
+let currentSmartLink = null;
+
+if (smartLinkButton) {
+    smartLinkButton.addEventListener('click', async (e) => {
+        e.preventDefault();
+        
+        // 1. Si ya tenemos el enlace, abrirlo
+        if (currentSmartLink) {
+            window.open(currentSmartLink, '_blank');
+            return;
+        }
+
+        // 2. Si no, pedirlo al servidor
+        // IMPORTANTE: HEMOS ELIMINADO EL CACHE BUSTER PARA QUE EL CACHE DEL WORKER FUNCIONE
+        if (currentSpotifyUrl && currentSpotifyUrl !== "NO_URL") {
+            // FIX CRÍTICO: Guardamos innerHTML en lugar de textContent
+            const originalHTML = smartLinkButton.innerHTML;
+            
+            smartLinkButton.textContent = "Cargando...";
+            smartLinkButton.style.opacity = "0.7";
+
+            try {
+                // Sin cacheBuster, el Worker puede responder desde la Caché de Cloudflare
+                const res = await fetch(`https://core.chcs.workers.dev/odesli?url=${encodeURIComponent(currentSpotifyUrl)}`);
+
+                if (!res.ok) {
+                    throw new Error(`Servidor respondió con error ${res.status}`);
+                }
+
+                const data = await res.json();
+
+                if (data.universalLink) {
+                    currentSmartLink = data.universalLink;
+                    window.open(currentSmartLink, '_blank');
+                } else {
+                    showNotification("No se encontraron enlaces de streaming");
+                }
+            } catch (err) {
+                console.error("Error fetching Odesli:", err);
+                if (err.message.includes("Saturada") || err.message.includes("429")) {
+                     showNotification("Enlaces saturados momentáneamente. Intenta en unos minutos.");
+                } else {
+                     showNotification("No se pudo obtener el enlace");
+                }
+            } finally {
+                // FIX: Restauramos innerHTML en lugar de textContent
+                smartLinkButton.innerHTML = originalHTML;
+                smartLinkButton.style.opacity = "1";
+            }
+        } else {
+            showNotification("Datos de Spotify no disponibles");
+        }
+    });
+}
+    
+// ==========================================================================
+// FUNCIÓN: fetchSongDetails
+// ==========================================================================
 async function fetchSongDetails(artist, title, album, fetchId) {
     if (!artist || !title) return;
     const sA = artist.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
@@ -713,15 +772,22 @@ async function fetchSongDetails(artist, title, album, fetchId) {
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const d = await res.json();
         
+        // Muro de Seguridad: Verificar ANTES de actualizar UI
         if (fetchId !== currentSongFetchId) return;
         
         if (d) {
             spotifyUrl = d.debugSpotifyUrl || "NO_URL";
             
+            // Guardamos la URL para usarla cuando hagan clic
             currentSpotifyUrl = spotifyUrl;
-            currentSmartLink = null;
             
+            // Resetear el enlace Odesli porque cambió de canción
+            currentSmartLink = null;
+
+            // 1. ACTUALIZACIÓN INMEDIATA (UI)
             if (d.imageUrl) displayAlbumCoverFromUrl(d.imageUrl);
+            
+            // Llamamos a la UI pasando NULL como links (para que no busque solo al recibir Spotify)
             updateAlbumDetailsWithSpotifyData(d, null);
 
             if (d.duration) {
@@ -741,9 +807,9 @@ async function fetchSongDetails(artist, title, album, fetchId) {
         logErrorForAnalysis('Spotify error', { error: e.message, artist: sA, title: sT, timestamp: new Date().toISOString() });
     }
 }
-
-// ==========================================================================
-// FUNCIÓN: getMusicBrainzDuration
+    
+// =======================================================================
+// FUNCIÓN: getMusicBrainzDuration (Integrada para evitar duplicados)
 // ==========================================================================
 async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId, spotifyArtist = '', spotifyTitle = '') {
     if (fetchId !== currentSongFetchId) return;
@@ -777,10 +843,9 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
                                 if (tooltipContent) tooltipContent.innerHTML = creditHtml;
                             } else {
                                 if (fetchId !== currentSongFetchId) return;
-                                creditsElement.textContent = 'S/D'; creditsElement.title = ''; 
-                                creditsElement.style.borderBottom = 'none'; currentCredits = "";
+                                creditsElement.textContent = 'S/D'; creditsElement.title = ''; creditsElement.style.borderBottom = 'none'; currentCredits = "";
                                 const tooltipContent = document.getElementById('tooltip-credits-content');
-                                if (tooltipContent) tooltipContent.innerHTML = '';
+                                if (tooltipContent) tooltipContent.textContent = '';
                             }
                         }
                         return; 
@@ -832,10 +897,9 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
                             if (tooltipContent) tooltipContent.innerHTML = creditHtml;
                         } else {
                             if (fetchId !== currentSongFetchId) return;
-                            creditsElement.textContent = 'S/D'; creditsElement.title = ''; 
-                            creditsElement.style.borderBottom = 'none'; currentCredits = "";
+                            creditsElement.textContent = 'S/D'; creditsElement.title = ''; creditsElement.style.borderBottom = 'none'; currentCredits = "";
                             const tooltipContent = document.getElementById('tooltip-credits-content');
-                            if (tooltipContent) tooltipContent.innerHTML = '';
+                            if (tooltipContent) tooltipContent.textContent = '';
                         }
                     }
                 }
@@ -845,10 +909,10 @@ async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId
         logErrorForAnalysis('MusicBrainz error', { error: e.message, artist, title, timestamp: new Date().toISOString() });
     }
 }
-
-// =======================================================================
-// FUNCIONES: FORMATO Y TRADUCCIÓN DE CRÉDITOS
-// =======================================================================
+    
+// ==========================================================================
+// FORMATEAR CRÉDITOS
+// ==========================================================================
 function formatCreditsList(relations) {
     if (!relations || !Array.isArray(relations) || relations.length === 0) return null;
     const roleMap = {};
@@ -865,6 +929,108 @@ function formatCreditsList(relations) {
         const names = roleMap[role].join(', ');
         return `<div><b>${role}</b> ${names}</div>`;
     }).join(''); 
+}
+    
+// ==========================================================================
+// FUNCIÓN: getMusicBrainzDuration (Versión consolidada)
+// ==========================================================================
+async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId, spotifyArtist = '', spotifyTitle = '') {
+    if (fetchId !== currentSongFetchId) return;
+    if (!canMakeApiCall('musicBrainz')) return;
+    try {
+        let recordingId = null;
+        if (isrc) {
+            try {
+                const isrcUrl = `https://musicbrainz.org/ws/2/isrc/${isrc}?inc=artist-rels&fmt=json`;
+                const res = await fetch(isrcUrl);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.recordings && data.recordings.length > 0) {
+                        const r = data.recordings[0];
+                        if (r.length && trackDuration === 0) {
+                            trackDuration = Math.floor(r.length / 1000);
+                            const m = Math.floor(trackDuration / 60);
+                            const s = Math.floor(trackDuration % 60);
+                            totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                        }
+                        const creditsElement = document.getElementById('trackCredits');
+                        if (creditsElement && r.relations) {
+                            const artistRelations = r.relations.filter(rel => rel.type && rel.artist);
+                            const creditHtml = formatCreditsList(artistRelations);
+                            if (fetchId !== currentSongFetchId) return;
+                            if (creditHtml) {
+                                currentCredits = creditHtml;
+                                creditsElement.textContent = 'Ver detalles';
+                                creditsElement.title = creditHtml.replace(/<[^>]*>?/gm, ''); 
+                                const tooltipContent = document.getElementById('tooltip-credits-content');
+                                if (tooltipContent) tooltipContent.innerHTML = creditHtml;
+                            } else {
+                                if (fetchId !== currentSongFetchId) return;
+                                creditsElement.textContent = 'S/D'; creditsElement.title = ''; creditsElement.style.borderBottom = 'none'; currentCredits = "";
+                                const tooltipContent = document.getElementById('tooltip-credits-content');
+                                if (tooltipContent) tooltipContent.textContent = '';
+                            }
+                        }
+                        return; 
+                    }
+                }
+            } catch (isrcError) {}
+        }
+
+        const searchArtist = spotifyArtist ? spotifyArtist : artist;
+        const searchTitle = spotifyTitle ? spotifyTitle : title;
+        const cleanTitle = searchTitle.replace(/\([^)]*\)/g, '').trim();
+        const searchUrl = `https://musicbrainz.org/ws/2/recording/?query=artist:"${encodeURIComponent(searchArtist)}" AND recording:"${encodeURIComponent(cleanTitle)}"&fmt=json&limit=5`;
+        
+        const res = await fetch(searchUrl);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        const d = await res.json();
+        
+        if (d.recordings && d.recordings.length > 0) {
+            const r = d.recordings.find(r => r.length) || d.recordings[0];
+            if (r && r.length) {
+                if (trackDuration === 0) {
+                    trackDuration = Math.floor(r.length / 1000);
+                    const m = Math.floor(trackDuration / 60);
+                    const s = Math.floor(trackDuration % 60);
+                    totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                }
+                recordingId = r.id; 
+            }
+        }
+
+        if (recordingId) {
+            try {
+                await new Promise(resolve => setTimeout(resolve, 1100)); 
+                if (fetchId !== currentSongFetchId) return;
+                const creditsUrl = `https://musicbrainz.org/ws/2/recording/${recordingId}?inc=artist-rels&fmt=json`;
+                const creditsRes = await fetch(creditsUrl);
+                if (creditsRes.ok) {
+                    const creditsData = await creditsRes.json();
+                    const creditsElement = document.getElementById('trackCredits');
+                    if (creditsElement && creditsData.relations) {
+                        const artistRelations = creditsData.relations.filter(rel => rel.type && rel.artist);
+                        const creditHtml = formatCreditsList(artistRelations);
+                        if (fetchId !== currentSongFetchId) return;
+                        if (creditHtml) {
+                            currentCredits = creditHtml;
+                            creditsElement.textContent = 'Ver detalles';
+                            creditsElement.title = creditHtml.replace(/<[^>]*>?/gm, ''); 
+                            const tooltipContent = document.getElementById('tooltip-credits-content');
+                            if (tooltipContent) tooltipContent.innerHTML = creditHtml;
+                        } else {
+                            if (fetchId !== currentSongFetchId) return;
+                            creditsElement.textContent = 'S/D'; creditsElement.title = ''; creditsElement.title = ''; creditsElement.style.borderBottom = 'none'; currentCredits = "";
+                            const tooltipContent = document.getElementById('tooltip-credits-content');
+                            if (tooltipContent) tooltipContent.textContent = '';
+                        }
+                    }
+                }
+            } catch (creditError) {}
+        }
+    } catch (e) {
+        logErrorForAnalysis('MusicBrainz error', { error: e.message, artist, title, timestamp: new Date().toISOString() });
+    }
 }
     
 function translateRole(role) {
@@ -922,6 +1088,7 @@ function updateAlbumDetailsWithSpotifyData(d, links) {
         else trackIsrc.textContent = '----';
     }
 
+    // =======================================================================
     // GESTIÓN BOTÓN SMARTLINK (SIEMPRE VISIBLE SI HAY DATOS SPOTIFY)
     // =======================================================================
     if (smartLinkButton) {
@@ -929,10 +1096,8 @@ function updateAlbumDetailsWithSpotifyData(d, links) {
         smartLinkButton.setAttribute('aria-label', 'Obtener enlaces de esta canción');
     }
 }
+// =======================================================================
 
-// =======================================================================
-// UI PRINCIPAL
-// =======================================================================
 function updateUIWithTrackInfo(t) {
     if (songTitle.textContent !== t.title) songTitle.textContent = t.title;
     if (songArtist.textContent !== t.artist) songArtist.textContent = t.artist;
@@ -1008,7 +1173,7 @@ function startCountdown() {
             const s = Math.floor(elapsed % 60);
             displayText = `+${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
             const currentElapsedSecond = Math.floor(elapsed);
-
+            
             if (currentElapsedSecond % 2 === 0 && currentElapsedSecond !== lastCheckedSecond && !isUpdatingSongInfo) {
                 updateSongInfo(true);
                 lastCheckedSecond = currentElapsedSecond;
@@ -1019,7 +1184,13 @@ function startCountdown() {
             displayText = `+${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
             lastCheckedSecond = -1; 
             if (d < 10) countdownTimer.classList.add('ending'); 
-            else countdownTimer.classList.remove('ending');
+            else countdownTimer.classList.remove('ending'); 
+        } else {
+            const m = Math.floor(d / 60);
+            const s = Math.floor(d % 60);
+            displayText = `+${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            lastCheckedSecond = -1; 
+            if (d < 10) countdownTimer.classList.add('ending'); else countdownTimer.classList.remove('ending'); 
         }
         if (displayText) countdownTimer.textContent = displayText;
         if (isPlaying) animationFrameId = requestAnimationFrame(updateTimer);
@@ -1043,6 +1214,7 @@ function resetAlbumDetails() {
         const tooltipContent = document.getElementById('tooltip-credits-content');
         if (tooltipContent) tooltipContent.textContent = '';
     }
+    
     if (smartLinkButton) smartLinkButton.classList.remove('visible');
     currentSpotifyUrl = null;
     currentSmartLink = null;
@@ -1059,7 +1231,7 @@ function stopSongInfoUpdates() {
     if (rapidCheckInterval) { clearInterval(rapidCheckInterval); rapidCheckInterval = null; }
     resetCountdown(); resetAlbumCover(); resetAlbumDetails();
     currentTrackInfo = null;
-    songTitle.textContent = 'Seleccionar Estación';
+    songTitle.textContent = 'Seleccionar estación';
     songArtist.textContent = ''; songAlbum.textContent = '';
     updateShareButtonVisibility();
 }
@@ -1082,13 +1254,15 @@ if (audioPlayer) {
         const err = audioPlayer.error;
         if (err) {
             if (err.code == 1 || err.code == 4) { return; }
-            logErrorForAnalysis('Audio error', { code: err.code, msg: err.message, station: currentStation ? currentStation.id : 'unknown', timestamp: new Date().toISOString() });
+            logErrorForAnalysis('Audio error', { code: err.code, msg: err.message, station: currentStation ? currentStation.id : 'unknown', timestamp: new Date().toISOString(), userAgent: navigator.userAgent });
             if (err.message.includes('interrupt') || err.message.includes('aborted')) {
                 wasPlayingBeforeFocusLoss = true;
                 setTimeout(() => {
                     if (wasPlayingBeforeFocusLoss && currentStation) {
                         audioPlayer.play().then(() => {
                             isPlaying = true; updateStatus(true); startTimeStuckCheck();
+                            showNotification('Reproducción reanudada automáticamente');
+                            showNotification('Reproducción reanudada automáticamente');
                             showNotification('Reproducción reanudada automáticamente');
                             showNotification('Reproducción reanudada automáticamente');
                             showNotification('Reproducción reanudada automáticamente');
@@ -1111,6 +1285,9 @@ if (audioPlayer) {
                         isPlaying = true; updateStatus(true); startTimeStuckCheck();
                         showNotification('Reproducción reanudada automáticamente');
                         showNotification('Reproducción reanudada automáticamente');
+                        showNotification('Reproducción reanudada automáticamente');
+                        showNotification('Reproducción reanudada automáticamente');
+                        showNotification('Reproducción reanudada automáticamente');
                     }).catch(er => {
                         showNotification('Toca para reanudar');
                         playBtn.style.animation = 'pulse 2s infinite';
@@ -1125,12 +1302,9 @@ if (audioPlayer) {
             wasPlayingBeforeFocusLoss = true;
             setTimeout(() => {
                 if (wasPlayingBeforeFocusLoss && currentStation) {
-                    audioPlayer.play().then(() => { isPlaying = true; updateStatus(true); startTimeStuckCheck(); })
-                        .catch(e => console.error("Error fetchSongDetails (background):", e)); 
-                        // Notificamos que no se pudo recuperar la sesión
-                        showNotification('Error al cargar detalles (Fallo de red)';
-                    }
-                }, 2000);
+                    audioPlayer.play().then(() => { isPlaying = true; updateStatus(true); startTimeStuckCheck(); showPlaybackInfo(); }).catch(e => { });
+                } else { audioPlayer.play().then(() => { isPlaying = true; updateStatus(true); startTimeStuckCheck(); }).catch(e => {});
+            }, 2000);
         }
     });
 }
@@ -1152,7 +1326,7 @@ if (audioPlayer) {
     audioPlayer.addEventListener('ended', () => { isPlaying = false; updateStatus(false); wasPlayingBeforeFocusLoss = false; });
 }
 
-if (connectionManager) {
+const connectionManager = {
     isReconnecting: false, reconnectAttempts: 0, maxReconnectAttempts:5,
     initialReconnectDelay: 1000, maxReconnectDelay: 30000, reconnectTimeoutId: null, audioCheckInterval: null,
     start() {
@@ -1173,10 +1347,9 @@ if (connectionManager) {
                 showNotification('Conexión restaurada con éxito.');
                 if (currentStation && currentStation.service !== 'nrk') {
                     if (currentStation.service === 'somafm') startSomaFmPolling();
-                        else if (currentStation.service === 'radioparadise') startRadioParadisePolling();
-                        else startSongInfoUpdates();
-                        updateSongInfo(true);
-                    }
+                    else if (currentStation.service === 'radioparadise') startRadioParadisePolling();
+                    else startSongInfoUpdates();
+                    updateSongInfo(true);
                 }
             }
         }, 1000);
@@ -1187,8 +1360,7 @@ if (connectionManager) {
             songTitle.textContent = 'Error de conexión: no se pudo restaurar';
             songArtist.textContent = 'Presionar SONAR para intentar manualmente';
             songAlbum.textContent = ''; updateShareButtonVisibility();
-            this.stop();
-            return;
+            this.stop(); return;
         }
         this.reconnectAttempts++;
         const d = Math.min(this.initialReconnectDelay * Math.pow(2, this.reconnectAttempts - 1), this.maxReconnectDelay);
@@ -1200,12 +1372,12 @@ if (connectionManager) {
                 showPlaybackInfo();
                 this.stop();
                 showNotification('Conexión restaurada con éxito.');
-                if (currentStation.service !== 'nrk') {
+                if (currentStation && currentStation.service !== 'nrk') {
                     if (currentStation.service === 'somafm') startSomaFmPolling();
-                        else if (currentStation.service === 'radioparadise') startRadioParadisePolling();
-                        else startSongInfoUpdates();
-                        updateSongInfo(true);
-                    }
+                    else if (currentStation.service === 'radioparadise') startRadioParadisePolling();
+                    else startSongInfoUpdates();
+                    updateSongInfo(true);
+                }
             } catch (e) { this.attemptReconnect(); }
         }, d);
     }
@@ -1276,7 +1448,7 @@ function showInstallPwaButtons() {
         if (installPwaBtnAndroid) installPwaBtnAndroid.style.display = 'none';
         if (installPwaBtnIos) installPwaBtnIos.style.display = 'none'; return;
     }
-    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent.toLowerCase());
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
     if (isIos) {
         if (installPwaBtnAndroid) installPwaBtnAndroid.style.display = 'none';
         if (installPwaBtnIos) installPwaBtnIos.style.display = 'flex';
@@ -1298,37 +1470,22 @@ if (installPwaBtnAndroid) {
     });
 }
 if (installPwaBtnIos) {
-    installPwaBtnIos.addEventListener('click', (e) => { e.preventDefault(); showNotification('Para instalar en iOS: Pulsa el botón <strong>Compartir</strong> y luego <strong>Añadir a pantalla de inicio</strong>.'); });
-}
-setTimeout(showInstallPwaButtons, 1000);
-
-if (shareButton) { shareButton.addEventListener('click', () => { shareOptions.classList.toggle('active'); });
-document.addEventListener('click', (e) => { if (shareButton && shareOptions && !shareButton.contains(e.target) && !shareOptions.contains(e.target)) shareOptions.classList.remove('active'); });
-
-if (shareWhatsApp) {
-    shareWhatsApp.addEventListener('click', () => {
-        const title = songTitle.textContent;
-        const artist = songArtist.textContent;
-        if (title && artist && title !== 'a sonar' && title !== 'Conectando...' && title !== 'Seleccionar estación' && title !== 'A sonar' && title !== 'Reproduciendo...' && title !== 'Error de reproducción' && title !== 'Reconectando...' && artist !== '') {
-            const baseUrl = window.location.origin;
-            const stationParam = currentStation ? `?station=${currentStation.id}` : '';
-            const fullUrl = `${baseUrl}${stationParam}`;
-            const m = `Escuché ${title} de ${artist} en ${fullUrl} ¡Temazo en RadioMax!`;
-            const isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
-            if (isBrave) {
-                showNotification('En Brave, toca el enlace para abrir WhatsApp Web');
-                setTimeout(() => { window.open(`https://wa.me/?text=${encodeURIComponent(m)`, '_blank'); }, 1000);
-            } else if (isMob) {
-                const uri = `whatsapp://send?text=${encodeURIComponent(m)}`; 
-                const link = document.createElement('a');
-                link.href = uri; link.target = '_blank'; link.rel = 'noopener noreferrer';
-                document.body.appendChild(link); link.click(); document.body.removeChild(link);
-                setTimeout(() => { window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank'); }, 1500);
-            } else window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank');
-            if (shareOptions) shareOptions.classList.remove('active');
-        } else showNotification("Por favor, espera a que comience una canción para compartir");
+    installPwaBtnIos.addEventListener('click', (e) => {
+        e.preventDefault();
+        showNotification('Para instalar en iOS: Pulsa el botón <strong>Compartir</strong> y luego <strong>Añadir a pantalla de inicio</strong>.');
     });
+}
+
+function showInstallPwaButtons() {
+    if (window.matchMedia('(display-mode: standalone)').matches || installInvitationTimeout) return;
+    if (localStorage.getItem('rm_pwa_invite_dismissed') === 'true') return;
+    let os = 'other';
+    if (/android/i.test(navigator.userAgent)) os = 'android'; else if (/iphone|ipad|ipod/i.test(navigator.userAgent)) os = 'ios'; else if (/win/i.test(navigator.userAgent)) os = 'windows';
+    if (os === 'windows') return;
+    [installWindowsBtn, installAndroidBtn, installIosBtn].forEach(btn => btn.classList.add('disabled'));
+    const activeBtn = os === 'android' ? installAndroidBtn : (os === 'ios' ? installIosBtn : (os === 'windows' ? installWindowsBtn : null));
+    if (activeBtn) activeBtn.classList.remove('disabled');
+    installPwaInvitation.style.display = 'flex'; installInvitationTimeout = true;
 }
 
 if (closeInvitationBtn) { closeInvitationBtn.addEventListener('click', hideInstallInvitation); }
@@ -1343,7 +1500,7 @@ if (installWindowsBtn) {
                 deferredPrompt = null;
             });
             hideInstallInvitation();
-        } else showNotification("Para instalar, usa el menú del navegador y busca \"Añadir a pantalla de inicio\"");
+        } else showNotification("Para instalar, usa el menú del navegador y busca \"Añadir a pantalla de inicio\"\"");
     });
 }
 
@@ -1353,7 +1510,7 @@ if (installAndroidBtn) {
         if (deferredPrompt) {
             deferredPrompt.prompt();
             deferredPrompt.userChoice.then((r) => {
-                if (r.outcome === 'accepted') { console.log('User accepted A2HS prompt'); } else { console.log('User dismissed A2HS prompt'); }
+                if (r.outcome === 'accepted') { if (installPwaBtnAndroid) installPwaBtnAndroid.style.display = 'none'; }
                 deferredPrompt = null;
             });
             hideInstallInvitation();
@@ -1362,9 +1519,9 @@ if (installAndroidBtn) {
 }
 
 if (installIosBtn) {
-    installIosBtn.addEventListener('click', (e) => {
+    installPwaBtnIosBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        showNotification('Para instalar en iOS: Pulsa el botón <strong>Compartir</strong> y luego <strong>Añadir a pantalla de inicio</strong>.');
+        showNotification("Para instalar en iOS: Pulsa el botón <strong>Compartir</strong> y luego <strong>Añadir a pantalla de inicio</strong>.");
         hideInstallInvitation();
     });
 }
@@ -1382,7 +1539,7 @@ document.addEventListener('keydown', function(event) {
             if (name.startsWith(key)) matches.push(opt);
         });
         if (matches.length > 0) {
-            if (key === lastKeyPressed) { lastMatchIndex = (lastMatchIndex + 1) % matches.length; }
+            if (key === lastKeyPressed) { lastMatchIndex = (lastMatchIndex +1) % matches.length; }
             else { lastMatchIndex = 0; lastKeyPressed = key; }
             const opt = matches[lastMatchIndex];
             const id = opt.dataset.value;
@@ -1407,13 +1564,13 @@ if (volumeIcon) { updateVolumeIconPosition(); }
 const versionSpan = document.getElementById('version-number');
 if (versionSpan) {
     fetch('/sw.js')
-        .then(r => { if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`); return r.text(); })
+        .then(r => { if (!r.ok) throw new Error(`HTTP error! status: ${res.status}`); return r.text(); })
         .then(t => {
             const m = t.match(/^(?:\/\/\s*)?v?(\d+(?:\.\d+){1,2})/m);
             if (m && m[1]) versionSpan.textContent = m[1];
             else { versionSpan.textContent = 'N/D'; console.warn('No version match in sw.js'); }
         })
-        .catch(e => { console.error('Error loading sw version:', e); versionSpan.textContent = 'Error'; });
+        .catch(e) { console.error("Error loading sw version:", e); versionSpan.textContent = "Error"; });
 }
 
 if ('serviceWorker' in navigator) {
@@ -1436,7 +1593,7 @@ if ('serviceWorker' in navigator) {
                     });
                 });
             })
-            .catch(e) { console.error('SW error:', e); });
+            .catch(e) console.error('SW error:', e));
 
         navigator.serviceWorker.addEventListener('controllerchange', () => { 
             if (!refreshing) { refreshing = true; window.location.reload(); } 
@@ -1444,14 +1601,14 @@ if ('serviceWorker' in navigator) {
 
         if (btn) {
             btn.addEventListener('click', () => {
-                if (un) { un.style.display = 'none'; un.style.display = 'none'; un.style.display = 'none';
+                if (un) { un.style.display = 'none'; un.style.display = 'none'; }
                 navigator.serviceWorker.controller?.postMessage({ type: 'SKIP_WAITING' });
                 setTimeout(() => window.location.reload(), 100);
             });
-        }
+        });
     });
 }
-
+   
 // =======================================================================
 // INTERACCIÓN DE TOOLTIP (Floating UI)
 // =======================================================================
@@ -1476,7 +1633,7 @@ if (trackCredits && tooltipEl) {
     trackCredits.addEventListener('mouseenter', showTooltip);
     trackCredits.addEventListener('mouseleave', hideTooltip);
     trackCredits.addEventListener('focus', showTooltip);
-    trackCredits.addEventListener('blur', hideTooltip);
+    trackCredits.addEventListener('blur', hideTooltip');
 }
 
 // =======================================================================
@@ -1486,5 +1643,6 @@ if (trackCredits && tooltipEl) {
     console.error("Error fatal:", error);
     const le = document.getElementById('loadingStations');
     if (le) { le.textContent = `Error crítico: ${error.message}.`; le.style.color = '#ff6600'; }
-}
+});
+});
 });
