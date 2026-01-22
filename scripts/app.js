@@ -1,4 +1,4 @@
-// app.js - v5.0 (Safe Mode: No trailing commas, full braces, strict syntax)
+// app.js - v5.1 (Fix: Added missing global variables currentSpotifyUrl & currentSmartLink)
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm';
 
@@ -322,7 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const sliderWidth = volumeSlider.offsetWidth;
             const percent = volumeSlider.value / volumeSlider.max;
             const iconWidth = volumeIcon.offsetWidth;
-            const newPosition = percent * sliderWidth - (iconWidth /2);
+            const newPosition = percent * sliderWidth - (iconWidth / 2);
             volumeIcon.style.left = `${newPosition}px`;
         }
         function updateTooltipPosition() {
@@ -1139,7 +1139,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         const fetchId = Date.now() + Math.random();
                         currentSongFetchId = fetchId;
                         {
-                            // Bloque seguro para fetch
                             fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId)
                                 .catch(e => console.error("Error fetchSongDetails (background):", e));
                         }
@@ -1207,7 +1206,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const fetchId = Date.now() + Math.random();
                     currentSongFetchId = fetchId;
                     {
-                        // Bloque seguro para fetch
                         fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId)
                             .catch(e => console.error("Error fetchSongDetails (background):", e));
                     }
@@ -1266,7 +1264,6 @@ document.addEventListener('DOMContentLoaded', () => {
             let spotifyUrl = '';
 
             try {
-                // Retipado manual para evitar caracteres ocultos
                 const u = 'https://core.chcs.workers.dev/spotify?artist=' + encodeURIComponent(sA) + '&title=' + encodeURIComponent(sT) + '&album=' + encodeURIComponent(sAl);
                 const res = await fetch(u);
                 if (!res.ok) {
@@ -1293,7 +1290,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         trackDuration = d.duration;
                         const m = Math.floor(trackDuration / 60);
                         const s = Math.floor(trackDuration % 60);
-                        totalDuration.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+                        totalDuration.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
                     }
                     if (d.isrc) {
                         spotifyIsrc = d.isrc;
@@ -1306,7 +1303,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
-                // Llamada segura con argumentos separados
                 getMusicBrainzDuration(
                     sA, 
                     sT, 
@@ -1351,7 +1347,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     trackDuration = Math.floor(r.length / 1000);
                                     const m = Math.floor(trackDuration / 60);
                                     const s = Math.floor(trackDuration % 60);
-                                    totalDuration.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+                                    totalDuration.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
                                 }
                                 const creditsElement = document.getElementById('trackCredits');
                                 if (creditsElement && r.relations) {
@@ -1391,7 +1387,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const searchArtist = spotifyArtist ? spotifyArtist : artist;
                 const searchTitle = spotifyTitle ? spotifyTitle : title;
                 const cleanTitle = searchTitle.replace(/\([^)]*\)/g, '').trim();
-                // Retipado manual
                 const searchUrl = 'https://musicbrainz.org/ws/2/recording/?query=artist:"' + encodeURIComponent(searchArtist) + '" AND recording:"' + encodeURIComponent(cleanTitle) + '"&fmt=json&limit=5';
                 
                 const res = await fetch(searchUrl);
@@ -1407,7 +1402,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             trackDuration = Math.floor(r.length / 1000);
                             const m = Math.floor(trackDuration / 60);
                             const s = Math.floor(trackDuration % 60);
-                            totalDuration.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+                            totalDuration.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
                         }
                         recordingId = r.id; 
                     }
@@ -1581,7 +1576,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 const m = Math.floor(s / 60);
                 const sec = Math.floor(s % 60);
-                albumTotalDuration.textContent = String(m).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
+                albumTotalDuration.textContent = String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
             } else {
                 albumTotalDuration.textContent = '--:--';
             }
@@ -1677,7 +1672,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (trackDuration > 0) {
                 const m = Math.floor(trackDuration / 60);
                 const s = Math.floor(trackDuration % 60);
-                totalDuration.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+                totalDuration.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
             } else {
                 totalDuration.textContent = '(--:--)';
             }
@@ -1733,7 +1728,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const elapsed = Math.abs(d);
                     const m = Math.floor(elapsed / 60);
                     const s = Math.floor(elapsed % 60);
-                    displayText = '+' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+                    displayText = '+' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
                     const currentElapsedSecond = Math.floor(elapsed);
 
                     if (currentElapsedSecond % 2 === 0 && currentElapsedSecond !== lastCheckedSecond && !isUpdatingSongInfo) {
@@ -1743,7 +1738,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     const m = Math.floor(d / 60);
                     const s = Math.floor(d % 60);
-                    displayText = '+' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+                    displayText = '+' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
                     lastCheckedSecond = -1; 
                     if (d < 10) {
                         countdownTimer.classList.add('ending'); 
@@ -2097,7 +2092,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const baseUrl = window.location.origin;
                     const stationParam = currentStation ? '?station=' + currentStation.id : '';
                     const fullUrl = baseUrl + stationParam;
-                    // Uso de concatenación simple para máxima seguridad
                     const mensaje = 'Escuche ' + title + ' de ' + artist + ' en ' + fullUrl + ' - Temazo en RadioMax';
                     const isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
                     const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
