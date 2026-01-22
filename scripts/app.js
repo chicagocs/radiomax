@@ -1,4 +1,4 @@
-// app.js - v4.6 (Fix "Unexpected token 'catch'" - Importaciones CDN corregidas)
+// app.js - v4.7 (Fix syntax errors: keydown ternary, focus setTimeout, string interpolation)
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm';
 
@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
         audioPlayer.volume = 0.5;
 
         // ==========================================================================
-        // GESTIÓN DE CONEXIÓN (MOVIDO ARRIBA PARA EVITAR ERRORES DE REFERENCIA)
+        // GESTIÓN DE CONEXIÓN
         // ==========================================================================
         const connectionManager = {
             isReconnecting: false,
@@ -171,7 +171,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             currentStationId = stationId;
             const channelName = `station:${stationId}`;
-            // FIX: Añadida la llave de cierre faltante
             const channel = supabase.channel(channelName, { config: { presence: { key: getUserUniqueID() } } });
             channel.on('presence', { event: 'sync' }, () => {
                 const state = channel.presenceState();
@@ -1259,6 +1258,7 @@ document.addEventListener('DOMContentLoaded', () => {
             attemptResumePlayback();
             if (facebookVideoDetected) {
                 startFacebookDetection();
+                // FIX: Añadido paréntesis de cierre y delay para corregir el error de sintaxis
                 setTimeout(() => {
                     facebookVideoDetected = false;
                     if (pageFocusCheckInterval) { clearInterval(pageFocusCheckInterval); pageFocusCheckInterval = null; }
@@ -1266,7 +1266,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         facebookVideoDetected = false;
                         if (pageFocusCheckInterval) { clearInterval(pageFocusCheckInterval); pageFocusCheckInterval = null; }
                     }, 30000);
-                }
+                }, 30000);
             }
         });
 
@@ -1324,6 +1324,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const baseUrl = window.location.origin;
                     const stationParam = currentStation ? `?station=${currentStation.id}` : '';
                     const fullUrl = `${baseUrl}${stationParam}`;
+                    // FIX: Uso de backticks para interpolación correcta
                     const m = `Escuché ${title} de ${artist} en ${fullUrl} ¡Temazo en RadioMax!`;
                     const isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
                     const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
@@ -1403,8 +1404,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const custom = document.querySelector('.custom-select-wrapper');
                     const trig = custom.querySelector('.custom-select-trigger');
                     const st = stationsById[id];
-                    let txt = st.name;
-                    if (st.service === 'radioparadise') txt = st.name.split(' - ')[1] || st.name : st.name;
+                    // FIX: Corrección de sintaxis en el operador ternario
+                    let txt = st.service === 'radioparadise' ? (st.name.split(' - ')[1] || st.name) : st.name;
                     trig.textContent = txt;
                     custom.querySelectorAll('.custom-option').forEach(o => o.classList.remove('selected'));
                     opt.classList.add('selected');
