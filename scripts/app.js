@@ -1,4 +1,4 @@
-// app.js - v5.3 (Fix: SmartLink URL prioritization -> External URLs first)
+// app.js - v5.2 (Fix: Volume Slider input listener, SmartLink click action)
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm';
 
@@ -7,8 +7,6 @@ import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@float
 // ==========================================================================
 const SUPABASE_URL = 'https://xahbzlhjolnugpbpnbmo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_G_dlO7Q6PPT7fDQCvSN5lA_mbcqtxVl';
- // NOTA: Se usa la clave pública, es correcto para este uso de demo.
-
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentChannel = null;
@@ -21,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // ==========================================================================
         const stationSelect = document.getElementById('stationSelect');
         const playBtn = document.getElementById('playBtn');
-        const stopBtn = document document.getElementById('stopBtn');
+        const stopBtn = document.getElementById('stopBtn');
         const volumeSlider = document.getElementById('volumeSlider');
         const audioPlayer = document.getElementById('audioPlayer');
         const stationName = document.getElementById('stationName');
@@ -481,7 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 pageFocusCheckInterval = null;
             }
             if (audioContextCheckInterval) {
-                clearInterval(audioContextDebugCheckInterval); // FIX: Typo de variable corregido
+                clearInterval(audioContextCheckInterval); 
                 audioContextCheckInterval = null;
             }
             facebookVideoDetected = false;
@@ -934,6 +932,19 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        // ==========================================================================
+        // FIX: LISTENER VOLUMEN (Input event)
+        // ==========================================================================
+        if (volumeSlider) {
+            volumeSlider.addEventListener('input', () => {
+                updateVolumeIconPosition();
+                if (audioPlayer) {
+                    // Ajustar volumen real (0 a 1)
+                    audioPlayer.volume = volumeSlider.value / volumeSlider.max;
+                }
+            });
+        }
+
         if (playBtn) {
             playBtn.addEventListener('click', function() {
                 this.style.animation = '';
@@ -957,17 +968,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else {
                         alert('Por favor, seleccionar una estación');
                     }
-                }
-            });
-        }
-
-        // FIX: Listener VOLUMEN
-        if (volumeSlider) {
-            volumeSlider.addEventListener('input', () => {
-                updateVolumeIconPosition();
-                if (audioPlayer) {
-                    // Ajustar volumen real (0 a 1)
-                    audioPlayer.volume = volumeSlider.value / volumeSlider.max;
                 }
             });
         }
@@ -1152,6 +1152,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const fetchId = Date.now() + Math.random();
                         currentSongFetchId = fetchId;
                         {
+                            // Bloque seguro para fetch
                             fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId)
                                 .catch(e => console.error("Error fetchSongDetails (background):", e));
                         }
@@ -1219,6 +1220,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const fetchId = Date.now() + Math.random();
                     currentSongFetchId = fetchId;
                     {
+                        // Bloque seguro para fetch
                         fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId)
                             .catch(e => console.error("Error fetchSongDetails (background):", e));
                     }
@@ -1277,7 +1279,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let spotifyUrl = '';
 
             try {
-                // FIX: Priorizar external_urls.spotify (Estándar API) para asegurar que el enlace funciona
+                // Retipado manual para evitar caracteres ocultos
                 const u = 'https://core.chcs.workers.dev/spotify?artist=' + encodeURIComponent(sA) + '&title=' + encodeURIComponent(sT) + '&album=' + encodeURIComponent(sAl);
                 const res = await fetch(u);
                 if (!res.ok) {
@@ -1290,14 +1292,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 if (d) {
-                    // 1. Intentar obtener enlace externo estándar (external_urls.spotify)
-                    if (d.external_urls && d.external_urls.spotify) {
-                        spotifyUrl = d.external_urls.spotify;
-                    } 
-                    // 2. Si falla, intentar debugSpotifyUrl (campo customizado del proxy)
-                    else if (d.debugSpotifyUrl) {
-                        spotifyUrl = d.debugSpotifyUrl;
-                    }
+                    spotifyUrl = d.debugSpotifyUrl || "NO_URL";
                     
                     currentSpotifyUrl = spotifyUrl;
                     currentSmartLink = null;
@@ -1324,6 +1319,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
+                // Llamada segura con argumentos separados
                 getMusicBrainzDuration(
                     sA, 
                     sT, 
@@ -1408,6 +1404,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const searchArtist = spotifyArtist ? spotifyArtist : artist;
                 const searchTitle = spotifyTitle ? spotifyTitle : title;
                 const cleanTitle = searchTitle.replace(/\([^)]*\)/g, '').trim();
+                // Retipado manual
                 const searchUrl = 'https://musicbrainz.org/ws/2/recording/?query=artist:"' + encodeURIComponent(searchArtist) + '" AND recording:"' + encodeURIComponent(cleanTitle) + '"&fmt=json&limit=5';
                 
                 const res = await fetch(searchUrl);
@@ -1851,19 +1848,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // ==========================================================================
-        // FIX: LISTENER SMARTLINK (Priorizando External URLs)
+        // FIX: LISTENER SMARTLINK
         // ==========================================================================
         if (smartLinkButton) {
             smartLinkButton.addEventListener('click', () => {
-                // Prioridad 1: External URLs (Estándar Spotify API)
-                // Prioridad 2: DebugSpotifyUrl (Proxy Personalizado)
-                const url = currentSpotifyUrl;
-                
-                if (url && url !== "NO_URL" && url !== null) {
-                    // Abrir en nueva pestaña para no bloquear la app del usuario
-                    window.open(url, '_blank');
+                if (currentSpotifyUrl && currentSpotifyUrl !== "NO_URL") {
+                    window.open(currentSpotifyUrl, '_blank');
                 } else {
-                    showNotification('Espera a que se carguen los metadatos de la canción para ver enlaces.');
+                    showNotification('Espera a que carguen los datos del tema para ver enlaces.');
                 }
             });
         }
@@ -2046,7 +2038,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 startFacebookDetection();
                 setTimeout(() => {
                     facebookVideoDetected = false;
-                    if (pointFocusCheckInterval) { // Fix typo en nombre de variable
+                    if (pageFocusCheckInterval) {
                         clearInterval(pageFocusCheckInterval); 
                         pageFocusCheckInterval = null;
                     }
@@ -2131,6 +2123,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const baseUrl = window.location.origin;
                     const stationParam = currentStation ? '?station=' + currentStation.id : '';
                     const fullUrl = baseUrl + stationParam;
+                    // Uso de concatenación simple para máxima seguridad
                     const mensaje = 'Escuche ' + title + ' de ' + artist + ' en ' + fullUrl + ' - Temazo en RadioMax';
                     const isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
                     const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
@@ -2158,7 +2151,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         shareOptions.classList.remove('active');
                     }
                 } else {
-                    showNotification('Por favor, espera a que comience una canción para compartir');
+                    showNotification('Por favor, espera a que comience una cancion para compartir');
                 }
             });
         }
