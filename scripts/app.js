@@ -692,25 +692,23 @@ if (smartLinkButton) {
     smartLinkButton.addEventListener('click', async (e) => {
         e.preventDefault();
         
-        // 1. Si ya tenemos el enlace, abrirlo y salir
+        // 1. Si ya tenemos el enlace, abrirlo
         if (currentSmartLink) {
             window.open(currentSmartLink, '_blank');
             return;
         }
 
         // 2. Si no, pedirlo al servidor
+        // IMPORTANTE: AQUÍ HEMOS ELIMINADO EL CACHE BUSTER PARA QUE EL CACHE DEL WORKER FUNCIONE
         if (currentSpotifyUrl && currentSpotifyUrl !== "NO_URL") {
-            // FIX CRÍTICO: Guardamos innerHTML en lugar de textContent
-            // Esto preserva spans/divs internos necesarios para el CSS
             const originalHTML = smartLinkButton.innerHTML;
             
             smartLinkButton.textContent = "Cargando...";
             smartLinkButton.style.opacity = "0.7";
 
             try {
-                // Generamos cacheBuster para evitar que el navegador cacheé la respuesta HTML del error anterior
-                const cacheBuster = `&_t=${Date.now()}`;
-                const res = await fetch(`https://core.chcs.workers.dev/odesli?url=${encodeURIComponent(currentSpotifyUrl)}${cacheBuster}`);
+                // Sin cacheBuster, el Worker puede responder desde la Caché de Cloudflare
+                const res = await fetch(`https://core.chcs.workers.dev/odesli?url=${encodeURIComponent(currentSpotifyUrl)}`);
 
                 if (!res.ok) {
                     throw new Error(`Servidor respondió con error ${res.status}`);
@@ -722,15 +720,19 @@ if (smartLinkButton) {
                     currentSmartLink = data.universalLink;
                     window.open(currentSmartLink, '_blank');
                 } else {
-                    console.error("Error Odesli:", data.error);
                     showNotification("No se encontraron enlaces de streaming");
                 }
             } catch (err) {
                 console.error("Error fetching Odesli:", err);
-                showNotification("No se pudo obtener el enlace");
+                // Si el servidor da 429, el Worker ya tiene la lógica para cachear el error negativo
+                // Así que al hacer clic de nuevo en pocos minutos, saldrá rápido del caché del Worker.
+                if (err.message.includes("Saturada") || err.message.includes("429")) {
+                     showNotification("Enlaces saturados momentáneamente. Intenta en unos minutos.");
+                } else {
+                     showNotification("No se pudo obtener el enlace");
+                }
             } finally {
-                // FIX: Restauramos innerHTML en lugar de textContent
-                // Esto recupera el icono y la estructura para que el CSS oculte el texto si corresponde
+                // Restauramos el contenido original (icono + texto)
                 smartLinkButton.innerHTML = originalHTML;
                 smartLinkButton.style.opacity = "1";
             }
@@ -740,54 +742,6 @@ if (smartLinkButton) {
     });
 }
     
-async function fetchSongDetails(artist, title, album, fetchId) {
-    if (!artist || !title) return;
-    const sA = artist.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
-    const sT = title.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
-    const sAl = album ? album.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "") : "";
-    
-    let spotifyIsrc = null;
-    let spotifyCleanArtist = '';
-    let spotifyCleanTitle = '';
-    let spotifyUrl = '';
-
-    try {
-        const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(sA)}&title=${encodeURIComponent(sT)}&album=${encodeURIComponent(sAl)}`;
-        const res = await fetch(u);
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const d = await res.json();
-        
-        if (fetchId !== currentSongFetchId) return;
-        
-        if (d) {
-            spotifyUrl = d.debugSpotifyUrl || "NO_URL";
-            // Guardamos la URL para usarla cuando hagan clic
-            currentSpotifyUrl = spotifyUrl;
-            // Resetear el enlace Odesli porque cambió de canción
-            currentSmartLink = null;
-
-            if (d.imageUrl) displayAlbumCoverFromUrl(d.imageUrl);
-            
-            // Llamamos a la UI pasando NULL como links (para que no busque solo al recibir Spotify)
-            updateAlbumDetailsWithSpotifyData(d, null);
-
-            if (d.duration) {
-              trackDuration = d.duration;
-              const m = Math.floor(trackDuration / 60);
-              const s = Math.floor(trackDuration % 60);
-              totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-            }
-            if (d.isrc) spotifyIsrc = d.isrc;
-            if (d.artists && Array.isArray(d.artists)) spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
-            if (d.title) spotifyCleanTitle = d.title;
-        }
-
-        getMusicBrainzDuration(sA, sT, sAl, spotifyIsrc, fetchId, spotifyCleanArtist, spotifyCleanTitle);
-    } catch (e) {
-        logErrorForAnalysis('Spotify error', { error: e.message, artist: sA, title: sT, timestamp: new Date().toISOString() });
-    }
-}
-
 // ==========================================================================
 // FORMATEAR CRÉDITOS
 // ==========================================================================
