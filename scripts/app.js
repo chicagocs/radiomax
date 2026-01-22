@@ -1306,19 +1306,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (installPwaBtnIos) {
             installPwaBtnIos.addEventListener('click', (e) => { e.preventDefault(); showNotification('Para instalar en iOS: Pulsa el botón <strong>Compartir</strong> y luego <strong>Añadir a pantalla de inicio</strong>.'); });
         }
-        setTimeout(showInstallPwaButtons, 1000);
+        
+setTimeout(showInstallPwaButtons, 1000);
 
 if (shareButton) { 
     shareButton.addEventListener('click', () => { 
         shareOptions.classList.toggle('active'); 
     });
     document.addEventListener('click', (e) => { 
-        if (shareButton && shareOptions && !shareButton.contains(e.target) && !shareOptions.contains(e.target)) 
+        if (shareButton && shareOptions && !shareButton.contains(e.target) && !shareOptions.contains(e.target)) {
             shareOptions.classList.remove('active'); 
+        }
     });
 }
-        
-        if (shareWhatsApp) {
+
+if (shareWhatsApp) {
     shareWhatsApp.addEventListener('click', () => {
         const title = songTitle.textContent;
         const artist = songArtist.textContent;
@@ -1326,26 +1328,42 @@ if (shareButton) {
             const baseUrl = window.location.origin;
             const stationParam = currentStation ? '?station=' + currentStation.id : '';
             const fullUrl = baseUrl + stationParam;
-            const m = 'Escuche ' + title + ' de ' + artist + ' en ' + fullUrl + ' Temazo en RadioMax';
+            const mensaje = 'Escuche ' + title + ' de ' + artist + ' en ' + fullUrl + ' - Temazo en RadioMax';
             const isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
             if (isBrave) {
                 showNotification('En Brave, toca el enlace para abrir WhatsApp Web');
-                setTimeout(() => { window.open('https://wa.me/?text=' + encodeURIComponent(m), '_blank'); }, 1000);
+                setTimeout(() => { 
+                    window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank'); 
+                }, 1000);
             } else if (isMob) {
-                const uri = 'whatsapp://send?text=' + encodeURIComponent(m); 
+                const uri = 'whatsapp://send?text=' + encodeURIComponent(mensaje); 
                 const link = document.createElement('a');
-                link.href = uri; link.target = '_blank'; link.rel = 'noopener noreferrer';
-                document.body.appendChild(link); link.click(); document.body.removeChild(link);
-                setTimeout(() => { window.open('https://wa.me/?text=' + encodeURIComponent(m), '_blank'); }, 1500);
-            } else window.open('https://wa.me/?text=' + encodeURIComponent(m), '_blank');
-            if (shareOptions) shareOptions.classList.remove('active');
-        } else showNotification("Por favor, espera a que comience una canción para compartir");
+                link.href = uri; 
+                link.target = '_blank'; 
+                link.rel = 'noopener noreferrer';
+                document.body.appendChild(link); 
+                link.click(); 
+                document.body.removeChild(link);
+                setTimeout(() => { 
+                    window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank'); 
+                }, 1500);
+            } else {
+                window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank');
+            }
+            if (shareOptions) {
+                shareOptions.classList.remove('active');
+            }
+        } else {
+            showNotification('Por favor, espera a que comience una cancion para compartir');
+        }
     });
 }
 
-        if (closeInvitationBtn) { closeInvitationBtn.addEventListener('click', hideInstallInvitation); }
-
+if (closeInvitationBtn) { 
+    closeInvitationBtn.addEventListener('click', hideInstallInvitation); 
+}
+        
         if (installWindowsBtn) {
             installWindowsBtn.addEventListener('click', (e) => {
                 e.preventDefault();
