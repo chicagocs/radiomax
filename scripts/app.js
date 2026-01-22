@@ -1458,7 +1458,10 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => window.location.reload(), 100);
         });
         }
-                
+
+        });
+        }
+                          
         // =======================================================================
         // INTERACCIÓN DE TOOLTIP (Floating UI)
         // =======================================================================
