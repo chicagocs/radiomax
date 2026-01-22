@@ -1,4 +1,4 @@
-// app.js - v4.7 (Fix syntax errors: keydown ternary, focus setTimeout, string interpolation)
+// app.js - v4.7
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm';
 
@@ -242,6 +242,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         function showNotification(message) {
             if (notification) { notification.textContent = message; notification.classList.add('show'); setTimeout(() => { notification.classList.remove('show'); }, 3000); }
+        }
+        // FIX: Función faltante añadida
+        function updateStatus(playing) {
+            if (!playBtn) return;
+            if (playing) {
+                playBtn.classList.add('playing');
+                playBtn.classList.remove('paused');
+                // Asumimos que hay lógica CSS para manejar el icono
+            } else {
+                playBtn.classList.remove('playing');
+                playBtn.classList.add('paused');
+            }
         }
         function showInstallInvitation() {
             if (window.matchMedia('(display-mode: standalone)').matches || installInvitationTimeout) return;
@@ -794,10 +806,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateAlbumDetailsWithSpotifyData(d, null);
 
                     if (d.duration) {
-                    trackDuration = d.duration;
-                    const m = Math.floor(trackDuration / 60);
-                    const s = Math.floor(trackDuration % 60);
-                    totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                        trackDuration = d.duration;
+                        const m = Math.floor(trackDuration / 60);
+                        const s = Math.floor(trackDuration % 60);
+                        totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
                     }
                     if (d.isrc) spotifyIsrc = d.isrc;
                     if (d.artists && Array.isArray(d.artists)) spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
@@ -1159,8 +1171,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                 audioPlayer.play().then(() => {
                                     isPlaying = true; updateStatus(true); startTimeStuckCheck();
                                     showNotification('Reproducción reanudada automáticamente');
-                                    showNotification('Reproducción reanudada automáticamente');
-                                    showNotification('Reproducción reanudada automáticamente');
                                 }).catch(er => {
                                     showNotification('Toca para reanudar');
                                     playBtn.style.animation = 'pulse 2s infinite';
@@ -1178,7 +1188,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (wasPlayingBeforeFocusLoss && currentStation) {
                             audioPlayer.play().then(() => {
                                 isPlaying = true; updateStatus(true); startTimeStuckCheck();
-                                showNotification('Reproducción reanudada automáticamente');
                                 showNotification('Reproducción reanudada automáticamente');
                             }).catch(er => {
                                 showNotification('Toca para reanudar');
@@ -1255,14 +1264,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         window.addEventListener('focus', () => {
-           attemptResumePlayback();
-        if (facebookVideoDetected) {
-           startFacebookDetection();
-           setTimeout(() => {
-            facebookVideoDetected = false;
-            if (pageFocusCheckInterval) { clearInterval(pageFocusCheckInterval); pageFocusCheckInterval = null; }
-            }, 30000);
-        }
+            attemptResumePlayback();
+            if (facebookVideoDetected) {
+                startFacebookDetection();
+                setTimeout(() => {
+                    facebookVideoDetected = false;
+                    if (pageFocusCheckInterval) { clearInterval(pageFocusCheckInterval); pageFocusCheckInterval = null; }
+                }, 30000);
+            }
         });
 
         document.addEventListener('click', () => {
@@ -1306,63 +1315,62 @@ document.addEventListener('DOMContentLoaded', () => {
         if (installPwaBtnIos) {
             installPwaBtnIos.addEventListener('click', (e) => { e.preventDefault(); showNotification('Para instalar en iOS: Pulsa el botón <strong>Compartir</strong> y luego <strong>Añadir a pantalla de inicio</strong>.'); });
         }
-        
-setTimeout(showInstallPwaButtons, 1000);
+        setTimeout(showInstallPwaButtons, 1000);
 
-if (shareButton) { 
-    shareButton.addEventListener('click', () => { 
-        shareOptions.classList.toggle('active'); 
-    });
-    document.addEventListener('click', (e) => { 
-        if (shareButton && shareOptions && !shareButton.contains(e.target) && !shareOptions.contains(e.target)) {
-            shareOptions.classList.remove('active'); 
+        if (shareButton) { 
+            shareButton.addEventListener('click', () => { 
+                shareOptions.classList.toggle('active'); 
+            });
+            document.addEventListener('click', (e) => { 
+                if (shareButton && shareOptions && !shareButton.contains(e.target) && !shareOptions.contains(e.target)) {
+                    shareOptions.classList.remove('active'); 
+                }
+            });
         }
-    });
-}
 
-if (shareWhatsApp) {
-    shareWhatsApp.addEventListener('click', () => {
-        const title = songTitle.textContent;
-        const artist = songArtist.textContent;
-        if (title && artist && title !== 'a sonar' && title !== 'Conectando...' && title !== 'Seleccionar estación' && title !== 'A sonar' && title !== 'Reproduciendo...' && title !== 'Error de reproducción' && title !== 'Reconectando...' && artist !== '') {
-            const baseUrl = window.location.origin;
-            const stationParam = currentStation ? '?station=' + currentStation.id : '';
-            const fullUrl = baseUrl + stationParam;
-            const mensaje = 'Escuche ' + title + ' de ' + artist + ' en ' + fullUrl + ' - Temazo en RadioMax';
-            const isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
-            if (isBrave) {
-                showNotification('En Brave, toca el enlace para abrir WhatsApp Web');
-                setTimeout(() => { 
-                    window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank'); 
-                }, 1000);
-            } else if (isMob) {
-                const uri = 'whatsapp://send?text=' + encodeURIComponent(mensaje); 
-                const link = document.createElement('a');
-                link.href = uri; 
-                link.target = '_blank'; 
-                link.rel = 'noopener noreferrer';
-                document.body.appendChild(link); 
-                link.click(); 
-                document.body.removeChild(link);
-                setTimeout(() => { 
-                    window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank'); 
-                }, 1500);
-            } else {
-                window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank');
-            }
-            if (shareOptions) {
-                shareOptions.classList.remove('active');
-            }
-        } else {
-            showNotification('Por favor, espera a que comience una cancion para compartir');
+        if (shareWhatsApp) {
+            shareWhatsApp.addEventListener('click', () => {
+                const title = songTitle.textContent;
+                const artist = songArtist.textContent;
+                if (title && artist && title !== 'a sonar' && title !== 'Conectando...' && title !== 'Seleccionar estación' && title !== 'A sonar' && title !== 'Reproduciendo...' && title !== 'Error de reproducción' && title !== 'Reconectando...' && artist !== '') {
+                    const baseUrl = window.location.origin;
+                    const stationParam = currentStation ? '?station=' + currentStation.id : '';
+                    const fullUrl = baseUrl + stationParam;
+                    const mensaje = 'Escuche ' + title + ' de ' + artist + ' en ' + fullUrl + ' - Temazo en RadioMax';
+                    const isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                    const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
+                    if (isBrave) {
+                        showNotification('En Brave, toca el enlace para abrir WhatsApp Web');
+                        setTimeout(() => { 
+                            window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank'); 
+                        }, 1000);
+                    } else if (isMob) {
+                        const uri = 'whatsapp://send?text=' + encodeURIComponent(mensaje); 
+                        const link = document.createElement('a');
+                        link.href = uri; 
+                        link.target = '_blank'; 
+                        link.rel = 'noopener noreferrer';
+                        document.body.appendChild(link); 
+                        link.click(); 
+                        document.body.removeChild(link);
+                        setTimeout(() => { 
+                            window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank'); 
+                        }, 1500);
+                    } else {
+                        window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank');
+                    }
+                    if (shareOptions) {
+                        shareOptions.classList.remove('active');
+                    }
+                } else {
+                    showNotification('Por favor, espera a que comience una cancion para compartir');
+                }
+            });
         }
-    });
-}
 
-if (closeInvitationBtn) { 
-    closeInvitationBtn.addEventListener('click', hideInstallInvitation); 
-}
+        if (closeInvitationBtn) { 
+            closeInvitationBtn.addEventListener('click', hideInstallInvitation); 
+        }
         
         if (installWindowsBtn) {
             installWindowsBtn.addEventListener('click', (e) => {
@@ -1423,7 +1431,6 @@ if (closeInvitationBtn) {
                     const custom = document.querySelector('.custom-select-wrapper');
                     const trig = custom.querySelector('.custom-select-trigger');
                     const st = stationsById[id];
-                    // FIX: Corrección de sintaxis en el operador ternario
                     let txt = st.service === 'radioparadise' ? (st.name.split(' - ')[1] || st.name) : st.name;
                     trig.textContent = txt;
                     custom.querySelectorAll('.custom-option').forEach(o => o.classList.remove('selected'));
@@ -1452,40 +1459,50 @@ if (closeInvitationBtn) {
                 let refreshing = false;
                 const un = document.getElementById('update-notification');
                 const btn = document.getElementById('update-reload-btn');
-                navigator.serviceWorker.register('/sw.js')
-                    .then(reg => {
+                
+                const registerSW = async () => {
+                    try {
+                        const reg = await navigator.serviceWorker.register('/sw.js');
+                        
                         if (reg.waiting) { 
                             reg.waiting.postMessage({ type: 'SKIP_WAITING' }); 
                             if (un) un.style.display = 'block'; 
                         }
                         reg.addEventListener('updatefound', () => {
                             const nw = reg.installing;
-                            nw?.addEventListener('statechange', () => {
-                                if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-                                    nw.postMessage({ type: 'SKIP_WAITING' });
-                                }
-                            });
+                            if (nw) {
+                                nw.addEventListener('statechange', () => {
+                                    if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                                        nw.postMessage({ type: 'SKIP_WAITING' });
+                                    }
+                                });
+                            }
                         });
-                    })
-                    .catch(e => { console.error('SW error:', e); });
+                    } catch (e) {
+                        console.error('SW registration failed:', e);
+                    }
+                };
+
+                registerSW();
 
                 navigator.serviceWorker.addEventListener('controllerchange', () => { 
                     if (!refreshing) { refreshing = true; window.location.reload(); } 
                 });
 
-        if (btn) {
-        btn.addEventListener('click', () => {
-        if (un) { 
-            un.style.display = 'none';
-        }
-        navigator.serviceWorker.controller?.postMessage({ type: 'SKIP_WAITING' });
-        setTimeout(() => window.location.reload(), 100);
-        });
+                if (btn) {
+                    btn.addEventListener('click', () => {
+                        if (un) {
+                            un.style.display = 'none';
+                        }
+                        if (navigator.serviceWorker.controller) {
+                            navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+                        }
+                        setTimeout(() => window.location.reload(), 100);
+                    });
+                }
+            });
         }
 
-        });
-        }
-                          
         // =======================================================================
         // INTERACCIÓN DE TOOLTIP (Floating UI)
         // =======================================================================
