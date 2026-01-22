@@ -1310,7 +1310,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (shareButton) { shareButton.addEventListener('click', () => { shareOptions.classList.toggle('active'); });
         document.addEventListener('click', (e) => { if (shareButton && shareOptions && !shareButton.contains(e.target) && !shareOptions.contains(e.target)) shareOptions.classList.remove('active'); });
-
+        }
+        
         if (shareWhatsApp) {
             shareWhatsApp.addEventListener('click', () => {
                 const title = songTitle.textContent;
