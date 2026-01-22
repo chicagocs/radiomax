@@ -1319,31 +1319,30 @@ if (shareButton) {
 }
         
         if (shareWhatsApp) {
-            shareWhatsApp.addEventListener('click', () => {
-                const title = songTitle.textContent;
-                const artist = songArtist.textContent;
-                if (title && artist && title !== 'a sonar' && title !== 'Conectando...' && title !== 'Seleccionar estación' && title !== 'A sonar' && title !== 'Reproduciendo...' && title !== 'Error de reproducción' && title !== 'Reconectando...' && artist !== '') {
-                    const baseUrl = window.location.origin;
-                    const stationParam = currentStation ? `?station=${currentStation.id}` : '';
-                    const fullUrl = `${baseUrl}${stationParam}`;
-                    // FIX: Uso de backticks para interpolación correcta
-                    const m = `Escuché ${title} de ${artist} en ${fullUrl} ¡Temazo en RadioMax!`;
-                    const isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                    const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
-                    if (isBrave) {
-                        showNotification('En Brave, toca el enlace para abrir WhatsApp Web');
-                        setTimeout(() => { window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank'); }, 1000);
-                    } else if (isMob) {
-                        const uri = `whatsapp://send?text=${encodeURIComponent(m)}`; 
-                        const link = document.createElement('a');
-                        link.href = uri; link.target = '_blank'; link.rel = 'noopener noreferrer';
-                        document.body.appendChild(link); link.click(); document.body.removeChild(link);
-                        setTimeout(() => { window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank'); }, 1500);
-                    } else window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank');
-                    if (shareOptions) shareOptions.classList.remove('active');
-                } else showNotification("Por favor, espera a que comience una canción para compartir");
-            });
-        }
+    shareWhatsApp.addEventListener('click', () => {
+        const title = songTitle.textContent;
+        const artist = songArtist.textContent;
+        if (title && artist && title !== 'a sonar' && title !== 'Conectando...' && title !== 'Seleccionar estación' && title !== 'A sonar' && title !== 'Reproduciendo...' && title !== 'Error de reproducción' && title !== 'Reconectando...' && artist !== '') {
+            const baseUrl = window.location.origin;
+            const stationParam = currentStation ? '?station=' + currentStation.id : '';
+            const fullUrl = baseUrl + stationParam;
+            const m = 'Escuche ' + title + ' de ' + artist + ' en ' + fullUrl + ' Temazo en RadioMax';
+            const isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
+            if (isBrave) {
+                showNotification('En Brave, toca el enlace para abrir WhatsApp Web');
+                setTimeout(() => { window.open('https://wa.me/?text=' + encodeURIComponent(m), '_blank'); }, 1000);
+            } else if (isMob) {
+                const uri = 'whatsapp://send?text=' + encodeURIComponent(m); 
+                const link = document.createElement('a');
+                link.href = uri; link.target = '_blank'; link.rel = 'noopener noreferrer';
+                document.body.appendChild(link); link.click(); document.body.removeChild(link);
+                setTimeout(() => { window.open('https://wa.me/?text=' + encodeURIComponent(m), '_blank'); }, 1500);
+            } else window.open('https://wa.me/?text=' + encodeURIComponent(m), '_blank');
+            if (shareOptions) shareOptions.classList.remove('active');
+        } else showNotification("Por favor, espera a que comience una canción para compartir");
+    });
+}
 
         if (closeInvitationBtn) { closeInvitationBtn.addEventListener('click', hideInstallInvitation); }
 
