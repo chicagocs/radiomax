@@ -1,4 +1,4 @@
-// app.js - v5.1 (Fix: Added missing global variables currentSpotifyUrl & currentSmartLink)
+// app.js - v5.2 (Fix: Volume Slider input listener, SmartLink click action)
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm';
 
@@ -932,6 +932,19 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        // ==========================================================================
+        // FIX: LISTENER VOLUMEN (Input event)
+        // ==========================================================================
+        if (volumeSlider) {
+            volumeSlider.addEventListener('input', () => {
+                updateVolumeIconPosition();
+                if (audioPlayer) {
+                    // Ajustar volumen real (0 a 1)
+                    audioPlayer.volume = volumeSlider.value / volumeSlider.max;
+                }
+            });
+        }
+
         if (playBtn) {
             playBtn.addEventListener('click', function() {
                 this.style.animation = '';
@@ -1139,6 +1152,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const fetchId = Date.now() + Math.random();
                         currentSongFetchId = fetchId;
                         {
+                            // Bloque seguro para fetch
                             fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId)
                                 .catch(e => console.error("Error fetchSongDetails (background):", e));
                         }
@@ -1206,6 +1220,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const fetchId = Date.now() + Math.random();
                     currentSongFetchId = fetchId;
                     {
+                        // Bloque seguro para fetch
                         fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId)
                             .catch(e => console.error("Error fetchSongDetails (background):", e));
                     }
@@ -1264,6 +1279,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let spotifyUrl = '';
 
             try {
+                // Retipado manual para evitar caracteres ocultos
                 const u = 'https://core.chcs.workers.dev/spotify?artist=' + encodeURIComponent(sA) + '&title=' + encodeURIComponent(sT) + '&album=' + encodeURIComponent(sAl);
                 const res = await fetch(u);
                 if (!res.ok) {
@@ -1303,6 +1319,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
+                // Llamada segura con argumentos separados
                 getMusicBrainzDuration(
                     sA, 
                     sT, 
@@ -1387,6 +1404,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const searchArtist = spotifyArtist ? spotifyArtist : artist;
                 const searchTitle = spotifyTitle ? spotifyTitle : title;
                 const cleanTitle = searchTitle.replace(/\([^)]*\)/g, '').trim();
+                // Retipado manual
                 const searchUrl = 'https://musicbrainz.org/ws/2/recording/?query=artist:"' + encodeURIComponent(searchArtist) + '" AND recording:"' + encodeURIComponent(cleanTitle) + '"&fmt=json&limit=5';
                 
                 const res = await fetch(searchUrl);
@@ -1829,6 +1847,19 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        // ==========================================================================
+        // FIX: LISTENER SMARTLINK
+        // ==========================================================================
+        if (smartLinkButton) {
+            smartLinkButton.addEventListener('click', () => {
+                if (currentSpotifyUrl && currentSpotifyUrl !== "NO_URL") {
+                    window.open(currentSpotifyUrl, '_blank');
+                } else {
+                    showNotification('Espera a que carguen los datos del tema para ver enlaces.');
+                }
+            });
+        }
+
         if (audioPlayer) {
             audioPlayer.addEventListener('error', (e) => {
                 const err = audioPlayer.error;
@@ -2092,6 +2123,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const baseUrl = window.location.origin;
                     const stationParam = currentStation ? '?station=' + currentStation.id : '';
                     const fullUrl = baseUrl + stationParam;
+                    // Uso de concatenación simple para máxima seguridad
                     const mensaje = 'Escuche ' + title + ' de ' + artist + ' en ' + fullUrl + ' - Temazo en RadioMax';
                     const isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
                     const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
