@@ -630,6 +630,167 @@ async function updateSomaFmInfo(bypassRateLimit = false) {
     } finally { isUpdatingSongInfo = false; }
 }
 
+// ==========================================================================
+// FUNCIÓN: fetchSongDetails
+// ==========================================================================
+async function fetchSongDetails(artist, title, album, fetchId) {
+    if (!artist || !title) return;
+    const sA = artist.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
+    const sT = title.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
+    const sAl = album ? album.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "") : "";
+    
+    let spotifyIsrc = null;
+    let spotifyCleanArtist = '';
+    let spotifyCleanTitle = '';
+    let spotifyUrl = '';
+
+    try {
+        const u = `https://core.chcs.workers.dev/spotify?artist=${encodeURIComponent(sA)}&title=${encodeURIComponent(sT)}&album=${encodeURIComponent(sAl)}`;
+        const res = await fetch(u);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        const d = await res.json();
+        
+        // Muro de Seguridad: Verificar ANTES de actualizar UI
+        if (fetchId !== currentSongFetchId) return;
+        
+        if (d) {
+            spotifyUrl = d.debugSpotifyUrl || "NO_URL";
+            
+            // Guardamos la URL para usarla cuando hagan clic
+            currentSpotifyUrl = spotifyUrl;
+            
+            // Resetear el enlace Odesli porque cambió de canción
+            currentSmartLink = null;
+
+            // 1. ACTUALIZACIÓN INMEDIATA (UI)
+            if (d.imageUrl) displayAlbumCoverFromUrl(d.imageUrl);
+            
+            // Llamamos a la UI pasando NULL como links (para que no busque solo al recibir Spotify)
+            updateAlbumDetailsWithSpotifyData(d, null);
+
+            if (d.duration) {
+              trackDuration = d.duration;
+              const m = Math.floor(trackDuration / 60);
+              const s = Math.floor(trackDuration % 60);
+              totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            }
+            if (d.isrc) spotifyIsrc = d.isrc;
+            if (d.artists && Array.isArray(d.artists)) spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
+            if (d.title) spotifyCleanTitle = d.title;
+        }
+
+        // 2. LLAMADA ASÍNCRONA A MUSICBRAINZ (No bloquea la UI)
+        getMusicBrainzDuration(sA, sT, sAl, spotifyIsrc, fetchId, spotifyCleanArtist, spotifyCleanTitle);
+        
+    } catch (e) {
+        logErrorForAnalysis('Spotify error', { error: e.message, artist: sA, title: sT, timestamp: new Date().toISOString() });
+    }
+}
+    
+// ==========================================================================
+// FUNCIÓN: getMusicBrainzDuration (Asegúrate de que esta también existe)
+// ==========================================================================
+async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId, spotifyArtist = '', spotifyTitle = '') {
+    if (fetchId !== currentSongFetchId) return;
+    if (!canMakeApiCall('musicBrainz')) return;
+    try {
+        let recordingId = null;
+        if (isrc) {
+            try {
+                const isrcUrl = `https://musicbrainz.org/ws/2/isrc/${isrc}?inc=artist-rels&fmt=json`;
+                const res = await fetch(isrcUrl);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.recordings && data.recordings.length > 0) {
+                        const r = data.recordings[0];
+                        if (r.length && trackDuration === 0) {
+                            trackDuration = Math.floor(r.length / 1000);
+                            const m = Math.floor(trackDuration / 60);
+                            const s = Math.floor(trackDuration % 60);
+                            totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                        }
+                        const creditsElement = document.getElementById('trackCredits');
+                        if (creditsElement && r.relations) {
+                            const artistRelations = r.relations.filter(rel => rel.type && rel.artist);
+                            const creditHtml = formatCreditsList(artistRelations);
+                            if (fetchId !== currentSongFetchId) return;
+                            if (creditHtml) {
+                                currentCredits = creditHtml;
+                                creditsElement.textContent = 'Ver detalles';
+                                creditsElement.title = creditHtml.replace(/<[^>]*>?/gm, ''); 
+                                const tooltipContent = document.getElementById('tooltip-credits-content');
+                                if (tooltipContent) tooltipContent.innerHTML = creditHtml;
+                            } else {
+                                if (fetchId !== currentSongFetchId) return;
+                                creditsElement.textContent = 'S/D'; creditsElement.title = ''; 
+                                creditsElement.style.borderBottom = 'none'; currentCredits = "";
+                                const tooltipContent = document.getElementById('tooltip-credits-content');
+                                if (tooltipContent) tooltipContent.innerHTML = '';
+                            }
+                        }
+                        return; 
+                    }
+                }
+            } catch (isrcError) {}
+        }
+
+        const searchArtist = spotifyArtist ? spotifyArtist : artist;
+        const searchTitle = spotifyTitle ? spotifyTitle : title;
+        const cleanTitle = searchTitle.replace(/\([^)]*\)/g, '').trim();
+        const searchUrl = `https://musicbrainz.org/ws/2/recording/?query=artist:"${encodeURIComponent(searchArtist)}" AND recording:"${encodeURIComponent(cleanTitle)}"&fmt=json&limit=5`;
+        
+        const res = await fetch(searchUrl);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        const d = await res.json();
+        
+        if (d.recordings && d.recordings.length > 0) {
+            const r = d.recordings.find(r => r.length) || d.recordings[0];
+            if (r && r.length) {
+                if (trackDuration === 0) {
+                    trackDuration = Math.floor(r.length / 1000);
+                    const m = Math.floor(trackDuration / 60);
+                    const s = Math.floor(trackDuration % 60);
+                    totalDuration.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                }
+                recordingId = r.id; 
+            }
+        }
+
+        if (recordingId) {
+            try {
+                await new Promise(resolve => setTimeout(resolve, 1100)); 
+                if (fetchId !== currentSongFetchId) return;
+                const creditsUrl = `https://musicbrainz.org/ws/2/recording/${recordingId}?inc=artist-rels&fmt=json`;
+                const creditsRes = await fetch(creditsUrl);
+                if (creditsRes.ok) {
+                    const creditsData = await creditsRes.json();
+                    const creditsElement = document.getElementById('trackCredits');
+                    if (creditsElement && creditsData.relations) {
+                        const artistRelations = creditsData.relations.filter(rel => rel.type && rel.artist);
+                        const creditHtml = formatCreditsList(artistRelations);
+                        if (fetchId !== currentSongFetchId) return;
+                        if (creditHtml) {
+                            currentCredits = creditHtml;
+                            creditsElement.textContent = 'Ver detalles';
+                            creditsElement.title = creditHtml.replace(/<[^>]*>?/gm, '');
+                            const tooltipContent = document.getElementById('tooltip-credits-content');
+                            if (tooltipContent) tooltipContent.innerHTML = creditHtml;
+                        } else {
+                            if (fetchId !== currentSongFetchId) return;
+                            creditsElement.textContent = 'S/D'; creditsElement.title = ''; 
+                            creditsElement.style.borderBottom = 'none'; currentCredits = "";
+                            const tooltipContent = document.getElementById('tooltip-credits-content');
+                            if (tooltipContent) tooltipContent.innerHTML = '';
+                        }
+                    }
+                }
+            } catch (creditError) {}
+        }
+    } catch (e) {
+        logErrorForAnalysis('MusicBrainz error', { error: e.message, artist, title, timestamp: new Date().toISOString() });
+    }
+}
+       
 function startSomaFmPolling() {
     if (updateInterval) clearInterval(updateInterval);
     updateInterval = setInterval(() => updateSongInfo(true), 4000);
