@@ -1286,9 +1286,8 @@ document.addEventListener('DOMContentLoaded', () => {
             rpLoop();
         }
 
-        
         // =======================================================================
-        // LÓGICA: FETCH SONG DETAILS
+        // LÓGICA: FETCH SONG DETAILS (FIXED: Persistence logic)
         // =======================================================================
         async function fetchSongDetails(artist, title, album, fetchId) {
             if (!artist || !title) {
@@ -1298,8 +1297,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const sT = title.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
             const sAl = album ? album.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "") : "";
             
+            // Variables para pasar a MusicBrainz (inicializadas vacías)
             let spotifyIsrc = null;
-            let spotifyCleanArtist = '';
+            let spotifyCleanArtist = ''; 
             let spotifyCleanTitle = '';
             let spotifyUrl = '';
 
@@ -1315,111 +1315,110 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 
+                let spotifyVisualsAllowed = false; // Flag para controlar si usamos datos visuales de Spotify
+
                 if (d) {
                     spotifyUrl = d.debugSpotifyUrl || "NO_URL";
                     
-                    // --- MEJORA: Comprobación de datos válidos ---
-                    // Si Spotify devuelve undefined o vacío, salimos sin actualizar nada visualmente
+                    // --- PASO 1: Chequeo de datos básicos ---
                     if (!d.title || !d.artists || d.artists.length === 0) {
                         console.warn("Spotify devolvió datos vacíos/inválidos para:", sT, sA);
-                        // No hacemos nada, conservamos lo anterior o mostramos placeholder
-                        return; 
-                    }
-                    
-                    // --- INICIO VALIDACIÓN INTELIGENTE ---
-                    let isValidMatch = false;
-                    let artistMatch = false; // Nueva bandera para saber si al menos el artista pega
-
-                    const radioTitle = normalizeText(title);
-                    const radioArtist = normalizeText(artist);
-                    
-                    const spotifyTitle = normalizeText(d.title);
-                    // Usamos el primer artista principal
-                    const spotifyArtist = normalizeText(d.artists[0].name); 
-
-                    // 1. Comprobación de Artista (Strict + "The" tolerant)
-                    if (radioArtist === spotifyArtist) {
-                        artistMatch = true;
+                        spotifyVisualsAllowed = false;
+                        // IMPORTANTE: Ya NO hacemos 'return' aquí. Seguimos para intentar MusicBrainz.
                     } else {
-                        // Si "Beatles" != "The Beatles", quitamos "The" y volvemos a probar
-                        const cleanRadio = radioArtist.replace(/^the\s+/i, '');
-                        const cleanSpot = spotifyArtist.replace(/^the\s+/i, '');
-                        if (cleanRadio === cleanSpot) {
+                        // --- PASO 2: Validación de Coincidencia ---
+                        const radioTitle = normalizeText(title);
+                        const radioArtist = normalizeText(artist);
+                        
+                        const spotifyTitle = normalizeText(d.title);
+                        const spotifyArtistName = normalizeText(d.artists[0].name); 
+
+                        let isValidMatch = false;
+                        let artistMatch = false;
+
+                        // Comparación Artista
+                        if (radioArtist === spotifyArtistName) {
                             artistMatch = true;
+                        } else {
+                            // Intento tolerante a "The"
+                            const cleanRadio = radioArtist.replace(/^the\s+/i, '');
+                            const cleanSpot = spotifyArtistName.replace(/^the\s+/i, '');
+                            if (cleanRadio === cleanSpot) {
+                                artistMatch = true;
+                            }
+                        }
+
+                        // Comparación Título
+                        const titleMatch = (spotifyTitle.includes(radioTitle) || radioTitle.includes(spotifyTitle));
+
+                        // Decisión
+                        if (artistMatch && titleMatch) {
+                            isValidMatch = true;
+                        }
+
+                        // --- PASO 3: Decisión de Actualización ---
+                        
+                        if (isValidMatch) {
+                            // COINCIDENCIA PERFECTA: Usamos Todo + Enlace
+                            currentSpotifyUrl = spotifyUrl;
+                            currentSmartLink = null;
+                            spotifyVisualsAllowed = true;
+
+                            if (d.imageUrl) {
+                                displayAlbumCoverFromUrl(d.imageUrl);
+                            }
+                            updateAlbumDetailsWithSpotifyData(d, null);
+                            
+                            // Extraemos datos para MusicBrainz
+                            if (d.duration) {
+                                trackDuration = d.duration;
+                                const m = Math.floor(trackDuration / 60);
+                                const s = Math.floor(trackDuration % 60);
+                                totalDuration.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+                            }
+                            if (d.isrc) spotifyIsrc = d.isrc;
+                            if (d.artists && Array.isArray(d.artists)) spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
+                            if (d.title) spotifyCleanTitle = d.title;
+
+                        } else if (artistMatch) {
+                            // COINCIDENCIA PARCIAL (Visuals pero sin enlace seguro)
+                            console.warn("Coincidencia débil (Título inexacto). Mostrando portada sin enlace.", { 
+                                radio: title, spotify: d.title 
+                            });
+                            
+                            // NO actualizamos currentSpotifyUrl (no hay enlace seguro)
+                            spotifyVisualsAllowed = true;
+
+                            if (d.imageUrl) {
+                                displayAlbumCoverFromUrl(d.imageUrl);
+                            }
+                            updateAlbumDetailsWithSpotifyData(d, null);
+
+                            // Extraemos datos para MusicBrainz también
+                            if (d.duration) {
+                                trackDuration = d.duration;
+                                const m = Math.floor(trackDuration / 60);
+                                const s = Math.floor(trackDuration % 60);
+                                totalDuration.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+                            }
+                            if (d.isrc) spotifyIsrc = d.isrc;
+                            if (d.artists && Array.isArray(d.artists)) spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
+                            if (d.title) spotifyCleanTitle = d.title;
+
+                        } else {
+                            // SIN COINCIDENCIA (Artista distinto): No usamos visuales
+                            console.warn("Coincidencia débil descartada (Artista diferente):", { 
+                                radio: title, spotify: d.title 
+                            });
+                            spotifyVisualsAllowed = false;
                         }
                     }
-
-                    // 2. Comprobación de Título (Inclusión)
-                    const titleMatch = (spotifyTitle.includes(radioTitle) || radioTitle.includes(spotifyTitle));
-
-                    // Decisión final de coincidencia
-                    if (artistMatch && titleMatch) {
-                        isValidMatch = true;
-                    }
-
-                    // --- APLICACIÓN DE CAMBIOS ---
-                    
-                    if (isValidMatch) {
-                        // COINCIDENCIA PERFECTA: Mostrar TODO + Enlace
-                        currentSpotifyUrl = spotifyUrl;
-                        currentSmartLink = null;
-                        
-                        if (d.imageUrl) {
-                            displayAlbumCoverFromUrl(d.imageUrl);
-                        }
-                        updateAlbumDetailsWithSpotifyData(d, null);
-                        
-                        // Actualizamos datos internos para MusicBrainz
-                        if (d.duration) {
-                            trackDuration = d.duration;
-                            const m = Math.floor(trackDuration / 60);
-                            const s = Math.floor(trackDuration % 60);
-                            totalDuration.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-                        }
-                        if (d.isrc) spotifyIsrc = d.isrc;
-                        if (d.artists && Array.isArray(d.artists)) spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
-                        if (d.title) spotifyCleanTitle = d.title;
-
-                    } else if (artistMatch) {
-                        // COINCIDENCIA PARCIAL (Artista OK, Título raro/dudoso):
-                        // Mostramos Portada y Datos visuales (para que no se vea vacío),
-                        // PERO NO activamos el enlace para evitar disociación.
-                        
-                        console.warn("Coincidencia débil (Título inexacto pero Artista coincide). Mostrando portada sin enlace seguro.", { 
-                            radio: title, 
-                            spotify: d.title 
-                        });
-                        
-                        // NO actualizamos currentSpotifyUrl (se mantiene null o el anterior)
-                        
-                        if (d.imageUrl) {
-                            displayAlbumCoverFromUrl(d.imageUrl);
-                        }
-                        updateAlbumDetailsWithSpotifyData(d, null);
-
-                        // Actualizamos datos internos igualmente para MusicBrainz
-                        if (d.duration) {
-                            trackDuration = d.duration;
-                            const m = Math.floor(trackDuration / 60);
-                            const s = Math.floor(trackDuration % 60);
-                            totalDuration.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-                        }
-                        if (d.isrc) spotifyIsrc = d.isrc;
-                        if (d.artists && Array.isArray(d.artists)) spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
-                        if (d.title) spotifyCleanTitle = d.title;
-
-                    } else {
-                        // SIN COINCIDENCIA (Artista diferente):
-                        // No hacemos nada visual para evitar confundir al usuario con datos de otra canción.
-                        console.warn("Coincidencia débil descartada (Artista diferente):", { 
-                            radio: title, 
-                            spotify: d.title 
-                        });
-                    }
-                    // ----------------------------------------------------------------
                 }
 
-                // Llamada segura con argumentos separados (MusicBrainz)
+                // --- PASO 4: INTENTAR MUSICBRAINZ SIEMPRE ---
+                // Llamamos a MusicBrainz SIEMPRE, sin importar si Spotify falló.
+                // Si SpotifyVisualsAllowed es false, MusicBrainz usará 'sA' y 'sT' originales.
+                // Si SpotifyVisualsAllowed es true, usará los datos limpios de Spotify.
                 getMusicBrainzDuration(
                     sA, 
                     sT, 
@@ -1431,12 +1430,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 );
                 
             } catch (e) {
+                // Si hay error de RED con Spotify, también intentamos MusicBrainz
                 logErrorForAnalysis('Spotify error', {
                     error: e.message, 
                     artist: sA, 
                     title: sT, 
                     timestamp: new Date().toISOString()
                 });
+                
+                // Reintento de MusicBrainz en caso de fallo de Spotify
+                if (fetchId === currentSongFetchId) {
+                     getMusicBrainzDuration(
+                        sA, 
+                        sT, 
+                        sAl, 
+                        null, // No hay ISRC si falló Spotify
+                        fetchId, 
+                        '', // No hay artist limpio
+                        ''  // No hay title limpio
+                    );
+                }
             }
         }
         
