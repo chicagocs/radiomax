@@ -1168,7 +1168,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         songTransitionDetected = true;
                     }
-                // 000 } else {
+                     } // 000 else {
                 // 000     resetUI();
                 // 000 }
             } catch (e) {
