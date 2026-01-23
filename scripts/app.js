@@ -371,18 +371,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, 3000);
             }
         }
+        
         function updateStatus(playing) {
             if (!playBtn) {
                 return;
             }
             if (playing) {
+                playBtn.textContent = '▶ SONANDO';               
                 playBtn.classList.add('playing');
                 playBtn.classList.remove('paused');
             } else {
+                playBtn.textContent = '▶ SONAR';
+                
                 playBtn.classList.remove('playing');
                 playBtn.classList.add('paused');
             }
         }
+        
         function showInstallInvitation() {
             if (window.matchMedia('(display-mode: standalone)').matches || installInvitationTimeout) {
                 return;
