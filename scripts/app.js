@@ -1168,9 +1168,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         songTransitionDetected = true;
                     }
-                     } // 000 else {
-                // 000     resetUI();
-                // 000 }
+                     } else {
+                       // resetUI();
+                       }
             } catch (e) {
                 logErrorForAnalysis('SomaFM error', {
                     error: e.message, 
