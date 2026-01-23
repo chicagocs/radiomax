@@ -1,4 +1,4 @@
-// app.js - v5.2
+// app.js - v5.3 (Fix: Spotify Search, MusicBrainz Fallback, Button Text, Year Extraction)
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm';
 
@@ -302,7 +302,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // ==========================================================================
         // UTILIDAD: LIMPIEZA DE BÚSQUEDA (Para la URL de Spotify)
-        // Elimina paréntesis, palabras clave comunes y caracteres raros para encontrar la canción
         // ==========================================================================
         function cleanForSearch(text) {
             if (!text) return '';
@@ -410,15 +409,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             if (playing) {
-                // NUEVO: Cambiar texto a SONANDO
                 playBtn.textContent = '▶ SONANDO';
-                
                 playBtn.classList.add('playing');
                 playBtn.classList.remove('paused');
             } else {
-                // NUEVO: Cambiar texto a SONAR
                 playBtn.textContent = '▶ SONAR';
-                
                 playBtn.classList.remove('playing');
                 playBtn.classList.add('paused');
             }
@@ -840,7 +835,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // ==========================================================================
-        // LÓGICA
+        // LÓGICA DE CARGA DE ESTACIONES
         // ==========================================================================
         async function loadStations() {
             try {
@@ -974,13 +969,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // ==========================================================================
-        // FIX: LISTENER VOLUMEN (Input event)
+        // CONTROL DE VOLUMEN
         // ==========================================================================
         if (volumeSlider) {
             volumeSlider.addEventListener('input', () => {
                 updateVolumeIconPosition();
                 if (audioPlayer) {
-                    // Ajustar volumen real (0 a 1)
                     audioPlayer.volume = volumeSlider.value / volumeSlider.max;
                 }
             });
@@ -1302,9 +1296,9 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             rpLoop();
         }
-
+        
         // =======================================================================
-        // LÓGICA: FETCH SONG DETAILS
+        // LÓGICA: FETCH SONG DETAILS (FIXED FINAL)
         // =======================================================================
         async function fetchSongDetails(artist, title, album, fetchId) {
             if (!artist || !title) {
@@ -1322,8 +1316,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 // --- CAMBIO CRÍTICO: Usamos 'cleanForSearch' para la URL ---
-                // Esto aumenta drásticamente las probabilidades de encontrar la canción
-                // aunque el título de la radio tenga paréntesis o info extra.
                 const queryArtist = cleanForSearch(sA);
                 const queryTitle = cleanForSearch(sT);
 
@@ -1345,11 +1337,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     spotifyUrl = d.debugSpotifyUrl || "NO_URL";
                     
                     if (!d.title || !d.artists || d.artists.length === 0) {
-                        // Si sigue vacío incluso con la búsqueda limpia, es que no existe en Spotify
-                        // console.log("Buscando con Query Limpia...", queryTitle, queryArtist);
+                        console.warn("Spotify devolvió datos vacíos/inválidos para:", sT, sA);
                         spotifyVisualsAllowed = false;
                     } else {
-                        // --- VALIDACIÓN (Igual que antes, usando texto original para comparar) ---
+                        // --- VALIDACIÓN ---
                         const radioTitle = normalizeText(title);
                         const radioArtist = normalizeText(artist);
                         
@@ -1359,7 +1350,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         let isValidMatch = false;
                         let artistMatch = false;
 
-                        // Comparación Artista (Tolerante a "The")
+                        // Comparación Artista
                         if (radioArtist === spotifyArtistName) {
                             artistMatch = true;
                         } else {
@@ -1370,7 +1361,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         }
 
-                        // Comparación Título (Inclusión)
+                        // Comparación Título
                         const titleMatch = (spotifyTitle.includes(radioTitle) || radioTitle.includes(spotifyTitle));
 
                         if (artistMatch && titleMatch) {
@@ -1431,11 +1422,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 
             } catch (e) {
                 logErrorForAnalysis('Spotify error', { error: e.message, artist: sA, title: sT, timestamp: new Date().toISOString() });
+                
+                // --- REINTENTO EN CASO DE ERROR DE RED ---
+                if (fetchId === currentSongFetchId) {
+                     console.log("Error de red con Spotify, intentando MusicBrainz...");
+                     getMusicBrainzDuration(
+                        sA, sT, sAl, null, fetchId, '', ''
+                    );
+                }
             }
         }
-        
+
         // ==========================================================================
-        // FUNCIÓN: getMusicBrainzDuration
+        // FUNCIÓN: getMusicBrainzDuration (MEJORADA: Fallback de Año)
         // ==========================================================================
         async function getMusicBrainzDuration(artist, title, album, isrc = null, fetchId, spotifyArtist = '', spotifyTitle = '') {
             if (fetchId !== currentSongFetchId) {
@@ -1486,7 +1485,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // 2. Búsqueda Manual por Artista + Título
-                // Priorizamos los datos de Spotify si existen y son útiles, si no, usamos los de la radio
                 const searchArtist = (spotifyArtist && spotifyArtist !== spotifyTitle) ? spotifyArtist : artist;
                 const searchTitle = (spotifyTitle && spotifyTitle !== spotifyArtist) ? spotifyTitle : title;
                 const cleanTitle = searchTitle.replace(/\([^)]*\)/g, '').trim();
@@ -1500,12 +1498,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const d = await res.json();
                 
                 if (d.recordings && d.recordings.length > 0) {
-                    // Filtramos para intentar encontrar una coincidencia más exacta si hay varias
                     const r = d.recordings.find(r => r.length) || d.recordings[0];
                     
                     if (r && r.id) {
                         recordingId = r.id;
-                        // Si la búsqueda ya trae duración, la usamos inmediatamente
                         if (r.length && trackDuration === 0) {
                             trackDuration = Math.floor(r.length / 1000);
                             const m = Math.floor(trackDuration / 60);
@@ -1531,7 +1527,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             // Intentar obtener Año (Fallback de Spotify)
                             extractAndSetYear(creditsData);
                             
-                            // Créditos
                             const creditsElement = document.getElementById('trackCredits');
                             if (creditsElement && creditsData.relations) {
                                 const artistRelations = creditsData.relations.filter(rel => rel.type && rel.artist);
@@ -1561,25 +1556,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // -------------------------------------------------------------------------
-        // FUNCIÓN AUXILIAR: Extract and Set Year (Para usar en MusicBrainz)
+        // FUNCIÓN AUXILIAR: Extract and Set Year
         // -------------------------------------------------------------------------
         function extractAndSetYear(recordingData) {
-            // Si el Año ya tiene un valor real (no ----), no sobreescribimos
             const dateEl = document.getElementById('releaseDate');
-            if (dateEl && dateEl.textContent !== '----') {
+            if (!dateEl || dateEl.textContent !== '----') {
                 return;
             }
-
             if (recordingData.releases && recordingData.releases.length > 0) {
-                // Buscamos la primera fecha válida en la lista de releases
-                // A veces la primera es una compilación, pero sirve como referencia
                 for (let release of recordingData.releases) {
                     if (release.date) {
                         const year = release.date.substring(0, 4);
-                        // Validar que parezca un año
                         if (year.length === 4 && !isNaN(parseInt(year))) {
+                            console.log("Año encontrado en MusicBrainz:", year);
                             dateEl.textContent = year;
-                            return; // Terminamos
+                            return;
                         }
                     }
                 }
@@ -1960,30 +1951,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // ==========================================================================
         if (smartLinkButton) {
             smartLinkButton.addEventListener('click', (e) => {
-                // Prevenimos comportamientos por defecto si el botón está dentro de un formulario o link
                 e.preventDefault(); 
                 
                 if (currentSpotifyUrl && currentSpotifyUrl !== "NO_URL") {
                     try {
-                        // Creamos un elemento <a> temporal
                         const link = document.createElement('a');
                         link.href = currentSpotifyUrl;
-                        // Forzamos apertura en nueva ventana/pestaña
                         link.target = '_blank'; 
-                        // Atributos de seguridad para no exponer la ventana actual
                         link.rel = 'noopener noreferrer';
                         
-                        // Lo agregamos al DOM (necesario para algunos navegadores móviles)
                         document.body.appendChild(link);
-                        
-                        // Simulamos el clic
                         link.click();
-                        
-                        // Eliminamos el elemento temporal
                         document.body.removeChild(link);
                     } catch (err) {
                         console.error("Error al abrir smartlink:", err);
-                        // Fallback por si falla la simulación del clic
                         window.open(currentSpotifyUrl, '_blank');
                     }
                 } else {
@@ -2255,7 +2236,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const baseUrl = window.location.origin;
                     const stationParam = currentStation ? '?station=' + currentStation.id : '';
                     const fullUrl = baseUrl + stationParam;
-                    // Uso de concatenación simple para máxima seguridad
                     const mensaje = 'Escuche ' + title + ' de ' + artist + ' en ' + fullUrl + ' - Temazo en RadioMax';
                     const isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
                     const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
