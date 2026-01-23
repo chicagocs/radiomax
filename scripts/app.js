@@ -1465,47 +1465,37 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             try {
                 let recordingId = null;
+                
+                // 1. Intento por ISRC (más preciso si existe)
                 if (isrc) {
                     try {
-                        const isrcUrl = 'https://musicbrainz.org/ws/2/isrc/' + isrc + '?inc=artist-rels&fmt=json';
+                        const isrcUrl = 'https://musicbrainz.org/ws/2/isrc/' + isrc + '?inc=artist-rels+release-rels&fmt=json';
                         const res = await fetch(isrcUrl);
                         if (res.ok) {
                             const data = await res.json();
                             if (data.recordings && data.recordings.length > 0) {
                                 const r = data.recordings[0];
+                                // Actualizar Duración
                                 if (r.length && trackDuration === 0) {
                                     trackDuration = Math.floor(r.length / 1000);
                                     const m = Math.floor(trackDuration / 60);
                                     const s = Math.floor(trackDuration % 60);
                                     totalDuration.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
                                 }
+                                // Intentar obtener Año (Fallback)
+                                extractAndSetYear(r);
+                                // Créditos
                                 const creditsElement = document.getElementById('trackCredits');
                                 if (creditsElement && r.relations) {
                                     const artistRelations = r.relations.filter(rel => rel.type && rel.artist);
                                     const creditHtml = formatCreditsList(artistRelations);
-                                    if (fetchId !== currentSongFetchId) {
-                                        return;
-                                    }
+                                    if (fetchId !== currentSongFetchId) { return; }
                                     if (creditHtml) {
                                         currentCredits = creditHtml;
                                         creditsElement.textContent = 'Ver detalles';
                                         creditsElement.title = creditHtml.replace(/<[^>]*>?/gm, ''); 
                                         const tooltipContent = document.getElementById('tooltip-credits-content');
-                                        if (tooltipContent) {
-                                            tooltipContent.innerHTML = creditHtml;
-                                        }
-                                    } else {
-                                        if (fetchId !== currentSongFetchId) {
-                                            return;
-                                        }
-                                        creditsElement.textContent = 'S/D'; 
-                                        creditsElement.title = ''; 
-                                        creditsElement.style.borderBottom = 'none'; 
-                                        currentCredits = "";
-                                        const tooltipContent = document.getElementById('tooltip-credits-content');
-                                        if (tooltipContent) {
-                                            tooltipContent.innerHTML = '';
-                                        }
+                                        if (tooltipContent) tooltipContent.innerHTML = creditHtml;
                                     }
                                 }
                                 return; 
@@ -1514,10 +1504,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     } catch (isrcError) {}
                 }
 
-                const searchArtist = spotifyArtist ? spotifyArtist : artist;
-                const searchTitle = spotifyTitle ? spotifyTitle : title;
+                // 2. Búsqueda Manual por Artista + Título
+                // Priorizamos los datos de Spotify si existen y son útiles, si no, usamos los de la radio
+                const searchArtist = (spotifyArtist && spotifyArtist !== spotifyTitle) ? spotifyArtist : artist;
+                const searchTitle = (spotifyTitle && spotifyTitle !== spotifyArtist) ? spotifyTitle : title;
                 const cleanTitle = searchTitle.replace(/\([^)]*\)/g, '').trim();
-                // Retipado manual
+                
                 const searchUrl = 'https://musicbrainz.org/ws/2/recording/?query=artist:"' + encodeURIComponent(searchArtist) + '" AND recording:"' + encodeURIComponent(cleanTitle) + '"&fmt=json&limit=5';
                 
                 const res = await fetch(searchUrl);
@@ -1527,59 +1519,55 @@ document.addEventListener('DOMContentLoaded', () => {
                 const d = await res.json();
                 
                 if (d.recordings && d.recordings.length > 0) {
+                    // Filtramos para intentar encontrar una coincidencia más exacta si hay varias
                     const r = d.recordings.find(r => r.length) || d.recordings[0];
-                    if (r && r.length) {
-                        if (trackDuration === 0) {
+                    
+                    if (r && r.id) {
+                        recordingId = r.id;
+                        // Si la búsqueda ya trae duración, la usamos inmediatamente
+                        if (r.length && trackDuration === 0) {
                             trackDuration = Math.floor(r.length / 1000);
                             const m = Math.floor(trackDuration / 60);
                             const s = Math.floor(trackDuration % 60);
                             totalDuration.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
                         }
-                        recordingId = r.id; 
                     }
                 }
 
+                // 3. Si encontramos un ID, hacemos una búsqueda profunda para Créditos y Año
                 if (recordingId) {
                     try {
                         await new Promise(resolve => setTimeout(resolve, 1100)); 
-                        if (fetchId !== currentSongFetchId) {
-                            return;
-                        }
-                        const creditsUrl = 'https://musicbrainz.org/ws/2/recording/' + recordingId + '?inc=artist-rels&fmt=json';
+                        if (fetchId !== currentSongFetchId) { return; }
+                        
+                        // Solicitamos también release-rels para intentar sacar el Año
+                        const creditsUrl = 'https://musicbrainz.org/ws/2/recording/' + recordingId + '?inc=artist-rels+release-rels&fmt=json';
                         const creditsRes = await fetch(creditsUrl);
+                        
                         if (creditsRes.ok) {
                             const creditsData = await creditsRes.json();
+                            
+                            // Intentar obtener Año (Fallback de Spotify)
+                            extractAndSetYear(creditsData);
+                            
+                            // Créditos
                             const creditsElement = document.getElementById('trackCredits');
                             if (creditsElement && creditsData.relations) {
                                 const artistRelations = creditsData.relations.filter(rel => rel.type && rel.artist);
                                 const creditHtml = formatCreditsList(artistRelations);
-                                if (fetchId !== currentSongFetchId) {
-                                    return;
-                                }
+                                if (fetchId !== currentSongFetchId) { return; }
                                 if (creditHtml) {
                                     currentCredits = creditHtml;
                                     creditsElement.textContent = 'Ver detalles';
                                     creditsElement.title = creditHtml.replace(/<[^>]*>?/gm, ''); 
                                     const tooltipContent = document.getElementById('tooltip-credits-content');
-                                    if (tooltipContent) {
-                                        tooltipContent.innerHTML = creditHtml;
-                                    }
-                                } else {
-                                    if (fetchId !== currentSongFetchId) {
-                                        return;
-                                    }
-                                    creditsElement.textContent = 'S/D'; 
-                                    creditsElement.title = ''; 
-                                    creditsElement.style.borderBottom = 'none'; 
-                                    currentCredits = "";
-                                    const tooltipContent = document.getElementById('tooltip-credits-content');
-                                    if (tooltipContent) {
-                                        tooltipContent.innerHTML = '';
-                                    }
+                                    if (tooltipContent) tooltipContent.innerHTML = creditHtml;
                                 }
                             }
                         }
                     } catch (creditError) {}
+                } else {
+                     console.warn("MusicBrainz: No se encontraron resultados para búsqueda manual:", searchTitle, searchArtist);
                 }
             } catch (e) {
                 logErrorForAnalysis('MusicBrainz error', {
@@ -1588,6 +1576,32 @@ document.addEventListener('DOMContentLoaded', () => {
                     title, 
                     timestamp: new Date().toISOString()
                 });
+            }
+        }
+
+        // -------------------------------------------------------------------------
+        // FUNCIÓN AUXILIAR: Extract and Set Year (Para usar en MusicBrainz)
+        // -------------------------------------------------------------------------
+        function extractAndSetYear(recordingData) {
+            // Si el Año ya tiene un valor real (no ----), no sobreescribimos
+            const dateEl = document.getElementById('releaseDate');
+            if (dateEl && dateEl.textContent !== '----') {
+                return;
+            }
+
+            if (recordingData.releases && recordingData.releases.length > 0) {
+                // Buscamos la primera fecha válida en la lista de releases
+                // A veces la primera es una compilación, pero sirve como referencia
+                for (let release of recordingData.releases) {
+                    if (release.date) {
+                        const year = release.date.substring(0, 4);
+                        // Validar que parezca un año
+                        if (year.length === 4 && !isNaN(parseInt(year))) {
+                            dateEl.textContent = year;
+                            return; // Terminamos
+                        }
+                    }
+                }
             }
         }
 
