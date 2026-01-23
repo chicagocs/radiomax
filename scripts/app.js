@@ -1,4 +1,4 @@
-// app.js - v5.2 (Fix: Volume Slider input listener, SmartLink click action)
+// app.js - v5.2
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm';
 
@@ -377,6 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             if (playing) {
+                // NUEVO: Cambiar texto a SONANDO
                 playBtn.textContent = '▶ SONANDO';
                 
                 playBtn.classList.add('playing');
@@ -1269,6 +1270,7 @@ document.addEventListener('DOMContentLoaded', () => {
             rpLoop();
         }
 
+        
         // =======================================================================
         // LÓGICA: FETCH SONG DETAILS
         // =======================================================================
@@ -1301,29 +1303,65 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (d) {
                     spotifyUrl = d.debugSpotifyUrl || "NO_URL";
                     
-                    currentSpotifyUrl = spotifyUrl;
-                    currentSmartLink = null;
-                    
-                    if (d.imageUrl) {
-                        displayAlbumCoverFromUrl(d.imageUrl);
-                    }
-                    updateAlbumDetailsWithSpotifyData(d, null);
+                    // --- INICIO VALIDACIÓN DE COINCIDENCIA ---
+                    let isValidMatch = false;
 
-                    if (d.duration) {
-                        trackDuration = d.duration;
-                        const m = Math.floor(trackDuration / 60);
-                        const s = Math.floor(trackDuration % 60);
-                        totalDuration.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+                    // 1. Normalizar los nombres para compararlos justo
+                    const radioTitle = normalizeText(title);
+                    const radioArtist = normalizeText(artist);
+                    
+                    // Verificamos que vengan datos de Spotify válidos
+                    if (d.artists && d.artists.length > 0 && d.title) {
+                        const spotifyTitle = normalizeText(d.title);
+                        // Usamos el primer artista principal de Spotify para comparar
+                        const spotifyArtist = normalizeText(d.artists[0].name); 
+
+                        // 2. Comparar Artista (Deben ser idénticos tras normalizar)
+                        if (radioArtist === spotifyArtist) {
+                            // 3. Comparar Título (Verificamos si uno contiene al otro)
+                            // Esto cubre casos como "Rolling in the deep" vs "Rolling in the deep (Remix)"
+                            if (spotifyTitle.includes(radioTitle) || radioTitle.includes(spotifyTitle)) {
+                                isValidMatch = true;
+                            }
+                        }
                     }
-                    if (d.isrc) {
-                        spotifyIsrc = d.isrc;
+
+                    // --- FIN VALIDACIÓN ---
+
+                    if (isValidMatch) {
+                        // SOLO si coincide, actualizamos los enlaces y la foto
+                        currentSpotifyUrl = spotifyUrl;
+                        currentSmartLink = null;
+                        
+                        if (d.imageUrl) {
+                            displayAlbumCoverFromUrl(d.imageUrl);
+                        }
+                        updateAlbumDetailsWithSpotifyData(d, null);
+                        
+                        // También actualizamos las variables internas para MusicBrainz
+                        if (d.duration) {
+                            trackDuration = d.duration;
+                            const m = Math.floor(trackDuration / 60);
+                            const s = Math.floor(trackDuration % 60);
+                            totalDuration.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+                        }
+                        if (d.isrc) {
+                            spotifyIsrc = d.isrc;
+                        }
+                        if (d.artists && Array.isArray(d.artists)) {
+                            spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
+                        }
+                        if (d.title) {
+                            spotifyCleanTitle = d.title;
+                        }
+                    } else {
+                        // Si NO coincide, evitamos actualizar para no confundir al usuario
+                        console.warn("Coincidencia débil descartada:", { radio: title, spotify: d.title });
+                        // No actualizamos currentSpotifyUrl, así se queda en null (o la anterior)
+                        // Y tampoco actualizamos la portada ni los detalles
                     }
-                    if (d.artists && Array.isArray(d.artists)) {
-                        spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
-                    }
-                    if (d.title) {
-                        spotifyCleanTitle = d.title;
-                    }
+                    // ----------------------------------------------------------------
+
                 }
 
                 // Llamada segura con argumentos separados
