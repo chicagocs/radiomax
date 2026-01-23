@@ -1304,7 +1304,6 @@ document.addEventListener('DOMContentLoaded', () => {
             let spotifyUrl = '';
 
             try {
-                // Retipado manual para evitar caracteres ocultos
                 const u = 'https://core.chcs.workers.dev/spotify?artist=' + encodeURIComponent(sA) + '&title=' + encodeURIComponent(sT) + '&album=' + encodeURIComponent(sAl);
                 const res = await fetch(u);
                 if (!res.ok) {
@@ -1319,33 +1318,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (d) {
                     spotifyUrl = d.debugSpotifyUrl || "NO_URL";
                     
-                    // --- INICIO VALIDACIÓN DE COINCIDENCIA ---
+                    // --- MEJORA: Comprobación de datos válidos ---
+                    // Si Spotify devuelve undefined o vacío, salimos sin actualizar nada visualmente
+                    if (!d.title || !d.artists || d.artists.length === 0) {
+                        console.warn("Spotify devolvió datos vacíos/inválidos para:", sT, sA);
+                        // No hacemos nada, conservamos lo anterior o mostramos placeholder
+                        return; 
+                    }
+                    
+                    // --- INICIO VALIDACIÓN INTELIGENTE ---
                     let isValidMatch = false;
+                    let artistMatch = false; // Nueva bandera para saber si al menos el artista pega
 
-                    // 1. Normalizar los nombres para compararlos justo
                     const radioTitle = normalizeText(title);
                     const radioArtist = normalizeText(artist);
                     
-                    // Verificamos que vengan datos de Spotify válidos
-                    if (d.artists && d.artists.length > 0 && d.title) {
-                        const spotifyTitle = normalizeText(d.title);
-                        // Usamos el primer artista principal de Spotify para comparar
-                        const spotifyArtist = normalizeText(d.artists[0].name); 
+                    const spotifyTitle = normalizeText(d.title);
+                    // Usamos el primer artista principal
+                    const spotifyArtist = normalizeText(d.artists[0].name); 
 
-                        // 2. Comparar Artista (Deben ser idénticos tras normalizar)
-                        if (radioArtist === spotifyArtist) {
-                            // 3. Comparar Título (Verificamos si uno contiene al otro)
-                            // Esto cubre casos como "Rolling in the deep" vs "Rolling in the deep (Remix)"
-                            if (spotifyTitle.includes(radioTitle) || radioTitle.includes(spotifyTitle)) {
-                                isValidMatch = true;
-                            }
+                    // 1. Comprobación de Artista (Strict + "The" tolerant)
+                    if (radioArtist === spotifyArtist) {
+                        artistMatch = true;
+                    } else {
+                        // Si "Beatles" != "The Beatles", quitamos "The" y volvemos a probar
+                        const cleanRadio = radioArtist.replace(/^the\s+/i, '');
+                        const cleanSpot = spotifyArtist.replace(/^the\s+/i, '');
+                        if (cleanRadio === cleanSpot) {
+                            artistMatch = true;
                         }
                     }
 
-                    // --- FIN VALIDACIÓN ---
+                    // 2. Comprobación de Título (Inclusión)
+                    const titleMatch = (spotifyTitle.includes(radioTitle) || radioTitle.includes(spotifyTitle));
 
+                    // Decisión final de coincidencia
+                    if (artistMatch && titleMatch) {
+                        isValidMatch = true;
+                    }
+
+                    // --- APLICACIÓN DE CAMBIOS ---
+                    
                     if (isValidMatch) {
-                        // SOLO si coincide, actualizamos los enlaces y la foto
+                        // COINCIDENCIA PERFECTA: Mostrar TODO + Enlace
                         currentSpotifyUrl = spotifyUrl;
                         currentSmartLink = null;
                         
@@ -1354,33 +1369,57 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         updateAlbumDetailsWithSpotifyData(d, null);
                         
-                        // También actualizamos las variables internas para MusicBrainz
+                        // Actualizamos datos internos para MusicBrainz
                         if (d.duration) {
                             trackDuration = d.duration;
                             const m = Math.floor(trackDuration / 60);
                             const s = Math.floor(trackDuration % 60);
                             totalDuration.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
                         }
-                        if (d.isrc) {
-                            spotifyIsrc = d.isrc;
+                        if (d.isrc) spotifyIsrc = d.isrc;
+                        if (d.artists && Array.isArray(d.artists)) spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
+                        if (d.title) spotifyCleanTitle = d.title;
+
+                    } else if (artistMatch) {
+                        // COINCIDENCIA PARCIAL (Artista OK, Título raro/dudoso):
+                        // Mostramos Portada y Datos visuales (para que no se vea vacío),
+                        // PERO NO activamos el enlace para evitar disociación.
+                        
+                        console.warn("Coincidencia débil (Título inexacto pero Artista coincide). Mostrando portada sin enlace seguro.", { 
+                            radio: title, 
+                            spotify: d.title 
+                        });
+                        
+                        // NO actualizamos currentSpotifyUrl (se mantiene null o el anterior)
+                        
+                        if (d.imageUrl) {
+                            displayAlbumCoverFromUrl(d.imageUrl);
                         }
-                        if (d.artists && Array.isArray(d.artists)) {
-                            spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
+                        updateAlbumDetailsWithSpotifyData(d, null);
+
+                        // Actualizamos datos internos igualmente para MusicBrainz
+                        if (d.duration) {
+                            trackDuration = d.duration;
+                            const m = Math.floor(trackDuration / 60);
+                            const s = Math.floor(trackDuration % 60);
+                            totalDuration.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
                         }
-                        if (d.title) {
-                            spotifyCleanTitle = d.title;
-                        }
+                        if (d.isrc) spotifyIsrc = d.isrc;
+                        if (d.artists && Array.isArray(d.artists)) spotifyCleanArtist = d.artists.map(a => a.name).join(', ');
+                        if (d.title) spotifyCleanTitle = d.title;
+
                     } else {
-                        // Si NO coincide, evitamos actualizar para no confundir al usuario
-                        console.warn("Coincidencia débil descartada:", { radio: title, spotify: d.title });
-                        // No actualizamos currentSpotifyUrl, así se queda en null (o la anterior)
-                        // Y tampoco actualizamos la portada ni los detalles
+                        // SIN COINCIDENCIA (Artista diferente):
+                        // No hacemos nada visual para evitar confundir al usuario con datos de otra canción.
+                        console.warn("Coincidencia débil descartada (Artista diferente):", { 
+                            radio: title, 
+                            spotify: d.title 
+                        });
                     }
                     // ----------------------------------------------------------------
-
                 }
 
-                // Llamada segura con argumentos separados
+                // Llamada segura con argumentos separados (MusicBrainz)
                 getMusicBrainzDuration(
                     sA, 
                     sT, 
@@ -1400,7 +1439,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
         }
-
+        
         // ==========================================================================
         // FUNCIÓN: getMusicBrainzDuration
         // ==========================================================================
