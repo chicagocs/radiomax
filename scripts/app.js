@@ -284,6 +284,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 minInterval: 1000
             }
         };
+
+        // ==========================================================================
+        // UTILIDAD: NORMALIZACIÓN DE TEXTO (Para comparar canciones)
+        // ==========================================================================
+        function normalizeText(text) {
+            if (!text) return '';
+            return text.toString()
+                .toLowerCase() // Minúsculas
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Quitar acentos
+                .replace(/[\(\[]feat[^\)\]]*[\)\]]/gi, "") // Quitar "feat. xxx"
+                .replace(/[\(\[]remix[\)\]]/gi, "") // Quitar "Remix"
+                .replace(/[\(\][\].,:;-]/g, "") // Quitar caracteres raros
+                .replace(/\s+/g, " ") // Reducir espacios múltiples
+                .trim();
+        }
+        
         function showWelcomeScreen() {
             if (welcomeScreen) welcomeScreen.style.display = 'flex'; 
             if (playbackInfo) playbackInfo.style.display = 'none';
