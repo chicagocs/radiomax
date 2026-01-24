@@ -378,7 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             if (playing) {
-                playBtn.textContent = '▶ SONANDO';               
+                playBtn.textContent = '▶ PAUSAR';               
                 playBtn.classList.add('playing');
                 playBtn.classList.remove('paused');
             } else {
