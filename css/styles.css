@@ -69,6 +69,22 @@ body {
     min-height: 100vh;
     padding: 20px;
     padding-bottom: 60px;
+    overflow: hidden;
+}
+
+/* ==========================================================================
+   OCULTAR SCROLLBARS EN PWA (WINDOWS/MAC)
+   ========================================================================== */
+
+/* Oculta barra en Firefox */
+html, body {
+    scrollbar-width: none; 
+}
+
+/* Oculta barra en Chrome, Edge, Safari (WebKit) */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+    display: none;
 }
 
 /* ==========================================================================
