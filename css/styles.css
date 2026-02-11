@@ -1304,27 +1304,3 @@ footer strong { color: var(--text-main); font-weight: bold; }
 }
 
 @media (max-width: 500px) { .smart-link-text { display: none; } }
-
-
-/* ==========================================================================
-   AJUSTES PWA (OCULTAR TEXTO EN MODO INSTALADO)
-   ========================================================================== */
-
-/* Detecta si la app está corriendo como PWA (standalone) en Android/iOS */
-@media all and (display-mode: standalone) {
-    
-    /* Oculta el contenedor del texto "COMPARTIR" */
-    .share-button-text {
-        display: none;
-    }
-
-    /* Opcional: Ajusta el botón para que el icono quede centrado y limpio */
-    .share-button {
-        /* Ajusta el padding para que el botón no se vea demasiado grande 
-           si solo contiene el icono */
-        padding: 5px; 
-        
-        /* Asegura que el icono no tenga margen extra ahora que no hay texto */
-        gap: 0;
-    }
-}
