@@ -146,9 +146,9 @@ body::-webkit-scrollbar {
     border: 2px solid var(--primary);
     border-radius: var(--radius-lg);
     padding: 25px 30px;
-    width: 500px;
-    min-width: 500px;
-    max-width: 500px;
+    width: 520px;
+    min-width: 520px;
+    max-width: 520px;
     box-shadow: var(--shadow-primary);
 }
 
