@@ -1260,13 +1260,13 @@ footer strong { color: var(--text-main); font-weight: bold; }
         bottom: 10px; 
         padding: 0 10px;       /* Evitar que toque los bordes */
     }
-}
 
-/* ==========================================================================
-   CORRECCIÓN BOTÓN COMPARTIR (MÓVIL)
-========================================================================== */
+
+   /* ==========================================================================
+      CORRECCIÓN BOTÓN COMPARTIR (MÓVIL)
+   ========================================================================== */
     
-/* Forzar la visibilidad (por si el JS falla o se pierde el estado) */
+   /* Forzar la visibilidad (por si el JS falla o se pierde el estado) */
     .share-button {
         opacity: 1 !important;       /* Forzamos opacidad total */
         visibility: visible !important;
@@ -1275,16 +1275,18 @@ footer strong { color: var(--text-main); font-weight: bold; }
         flex-shrink: 0;               
     }
 
-/* Ocultamos el texto "Compartir" y dejamos solo el icono para ahorrar espacio */
+   /* Ocultamos el texto "Compartir" y dejamos solo el icono para ahorrar espacio */
     .share-button-text {
         display: none;
     }
 
-/* Aseguramos que el icono se vea bien */
+   /* Aseguramos que el icono se vea bien */
     .share-button svg {
         width: 18px;
         height: 18px;
     }
+
+}
 
 /* ==========================================================================
    TOOLTIP FLOTANTE (Floating UI - CRÉDITOS)
