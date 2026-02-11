@@ -1176,114 +1176,105 @@ footer strong { color: var(--text-main); font-weight: bold; }
     
     /* --- 1. CONTENEDOR PRINCIPAL --- */
     .player-container {
-        width: 100%;           /* Ocupa todo el ancho disponible */
-        padding: 15px 12px;    /* Reduce el padding lateral para ganar espacio */
-        border-width: 1px;     /* Borde un poco más fino en móvil */
+        width: 100%;
+        padding: 15px 12px;
+        border-width: 1px;
     }
 
     /* --- 2. HEADER Y ESTACIÓN --- */
     .station-name {
-        font-size: 20px;       /* Título un poco más pequeño */
+        font-size: 20px;
         padding-top: 5px;
     }
 
     #filterToggleStar {
-        top: -15px;            /* Ajustar posición del botón de favoritos global */
+        top: -15px;
         width: 2rem;
         height: 2rem;
     }
 
     /* --- 3. SELECTOR DE CANCIONES --- */
     .station-selector { margin-bottom: 20px; }
-    
-    .custom-select-trigger {
-        padding: 10px;         /* Menos padding en el selector */
-        font-size: 14px;
-    }
-    
+    .custom-select-trigger { padding: 10px; font-size: 14px; }
     .custom-option { padding: 8px; }
 
     /* --- 4. ALBUM Y NOW PLAYING --- */
-    /* Reducir tamaño de carátula para dar espacio al texto */
-    .album-cover { 
-        width: 80px; 
-        height: 80px; 
-    }
-
+    .album-cover { width: 80px; height: 80px; }
     .now-playing-container { gap: 10px; }
-    
-    .now-playing { 
-        padding: 10px; 
-        border-radius: 10px;
-    }
-
+    .now-playing { padding: 10px; border-radius: 10px; }
     .now-playing-label { font-size: 10px; }
 
-    /* Ajustes de texto */
     .song-title { font-size: 15px; }
     .song-artist { font-size: 13px; }
     .song-album { font-size: 11px; }
 
     /* --- 5. COUNTDOWN Y DETALLES --- */
     .countdown-container {
-        padding: 8px;          /* Padding uniforme y reducido */
-        height: auto;          /* Altura automática por si el texto se expande */
+        padding: 8px;
+        height: auto;
         min-height: 120px;
     }
 
-    .countdown-timer-column { width: 80px; } /* Columna izquierda más estrecha */
-    
+    .countdown-timer-column { width: 80px; }
     .countdown-label { font-size: 9px; }
     .countdown-timer { font-size: 13px; }
 
     .album-details-column { padding-left: 10px; }
-    
     .details-row { gap: 5px; }
-    .details-label { 
-        min-width: 50px; 
-        font-size: 9px; 
-    }
-    .details-value { 
-        font-size: 11px;       /* Tu ajuste original mantenido */
-        line-height: 1.2;
-    }
+    .details-label { min-width: 50px; font-size: 9px; }
+    .details-value { font-size: 11px; line-height: 1.2; }
 
     /* --- 6. TAGS Y BOTONES --- */
     .station-tags { gap: 4px; margin-top: 8px; }
     .station-tag { font-size: 10px; padding: 2px 6px; }
-
     .btn { padding: 10px; font-size: 14px; }
 
     /* --- 7. FOOTER --- */
     footer { 
         font-size: 10px; 
         bottom: 10px; 
-        padding: 0 10px;       /* Evitar que toque los bordes */
+        padding: 0 10px;
     }
 
-
-   /* ==========================================================================
-      CORRECCIÓN BOTÓN COMPARTIR (MÓVIL)
+    /* ==========================================================================
+      CORRECCIÓN CRÍTICA BOTÓN COMPARTIR (MÓVIL)
    ========================================================================== */
     
-   /* Forzar la visibilidad (por si el JS falla o se pierde el estado) */
+   /* 1. Evitamos que el contenedor del header se encoja a 0 */
+    .now-playing-header {
+        min-width: auto; /* Anula el min-width: 0 de la clase base */
+        width: 100%;
+    }
+
+    /* 2. Forzamos que el botón siempre tenga ancho */
     .share-button {
-        opacity: 1 !important;       /* Forzamos opacidad total */
+        opacity: 1 !important;
         visibility: visible !important;
         
-        /* IMPORTANTE: Evita que el botón se encoja a 0px si el título es largo */
-        flex-shrink: 0;               
+        display: flex; /* Mantener flex para centrar el icono */
+        flex-shrink: 0; /* No encogerse */
+        
+        /* CLAVE: Anulamos el min-width: 0 de la clase base */
+        min-width: auto; 
+        
+        /* Damos un área de toque mínima segura para el dedo */
+        width: 35px;
+        height: 35px;
+        min-height: 35px;
+        
+        padding: 5px; /* Espacio alrededor del icono */
+        background-color: rgba(255, 255, 255, 0.1); /* Fondo sutil para localizarlo */
+        border-radius: 4px;
+        z-index: 5;
     }
 
-   /* Ocultamos el texto "Compartir" y dejamos solo el icono para ahorrar espacio */
     .share-button-text {
-        display: none;
+        display: none; /* Ocultar texto */
     }
 
-   /* Aseguramos que el icono se vea bien */
     .share-button svg {
-        width: 18px;
-        height: 18px;
+        width: 20px; /* Icono más grande y visible */
+        height: 20px;
     }
 
 }
