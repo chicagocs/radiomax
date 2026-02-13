@@ -583,12 +583,16 @@ export default {
           
         } else if (path.startsWith("/radioparadise")) {
           const result = await handleRadioParadiseRequest(request);
-          response = new Response(result.stream, { 
-            headers: result.headers 
+          // Copiar headers originales y agregar CORS
+          const finalHeaders = new Headers(result.headers);
+          Object.entries(corsHeaders).forEach(([k, v]) => finalHeaders.set(k, v));
+          // NO aplicar security headers a radioparadise (es un stream)
+          return new Response(result.stream, { 
+            headers: finalHeaders 
           });
         }
 
-        // Aplicar security headers a respuestas API
+        // Aplicar security headers a respuestas API (excepto radioparadise)
         const finalHeaders = new Headers(response.headers);
         Object.entries(securityHeaders).forEach(([k, v]) => finalHeaders.set(k, v));
         
