@@ -108,24 +108,42 @@ async function checkRateLimit(env, ip) {
 
 /**
  * Valida que el origen del request sea el permitido
+ * IMPORTANTE: En producción, considera hacer esto más estricto
  */
 function validateOrigin(request) {
   const origin = request.headers.get("Origin");
   const referer = request.headers.get("Referer");
   
-  // Permitir requests sin Origin/Referer (curl, postman, etc) en desarrollo
-  // En producción podrías hacer esto más estricto
-  if (!origin && !referer) return true;
-  
-  if (origin && origin !== ALLOWED_ORIGIN) {
-    return false;
+  // Si tiene Origin header, debe coincidir exactamente
+  if (origin) {
+    return origin === ALLOWED_ORIGIN;
   }
   
-  if (referer && !referer.startsWith(ALLOWED_ORIGIN)) {
-    return false;
+  // Si tiene Referer header, debe empezar con el origen permitido
+  if (referer) {
+    return referer.startsWith(ALLOWED_ORIGIN);
   }
   
-  return true;
+  // SECURITY NOTE: Requests sin Origin ni Referer son permitidos
+  // Esto es necesario para:
+  // - curl/Postman en desarrollo
+  // - Algunos user agents antiguos
+  // - Server-to-server requests
+  // 
+  // Para MÁXIMA seguridad en producción, considera:
+  // 1. Retornar 'false' aquí
+  // 2. Implementar autenticación por API key
+  // 3. Usar Cloudflare Access o similar
+  
+  // Detectar si es una herramienta de desarrollo
+  const userAgent = request.headers.get("User-Agent") || "";
+  const isDevelopmentTool = userAgent.includes("curl") || 
+                           userAgent.includes("Postman") ||
+                           userAgent.includes("Insomnia");
+  
+  // Por ahora permitimos requests sin headers (comentar la siguiente línea para bloquearlos)
+  // return true; // Cambiar a 'return isDevelopmentTool;' para más seguridad
+  return false; // Máxima seguridad
 }
 
 // --- HANDLER: SPOTIFY (OPTIMIZADO Y SEGURO) ---
@@ -408,8 +426,11 @@ async function handleRadioParadiseRequest(request) {
       throw new Error('MISSING_PARAMETER');
     }
 
-    // Validar que el path sea seguro
-    if (path.includes('..') || path.startsWith('/')) {
+    // Whitelist de paths válidos de Radio Paradise
+    // Esto previene path traversal y abuse
+    const VALID_RP_PATHS = /^(api\/now_playing|api\/get_block|get_block|now_playing)/;
+    if (!VALID_RP_PATHS.test(path)) {
+      console.warn('[Radio Paradise] Invalid path attempted:', path);
       throw new Error('INVALID_PATH');
     }
 
@@ -548,13 +569,19 @@ export default {
         }
 
         // Rate limiting
-        const clientIP = request.headers.get("CF-Connecting-IP") || "unknown";
-        try {
-          await checkRateLimit(env, clientIP);
-        } catch (err) {
-          if (err.message === 'RATE_LIMIT_EXCEEDED') {
-            console.warn('[Rate Limit] IP blocked:', clientIP);
-            return createErrorResponse(429, "Demasiadas solicitudes. Intenta más tarde.");
+        const clientIP = request.headers.get("CF-Connecting-IP");
+        if (!clientIP) {
+          console.error('[Rate Limit] No client IP detected - possible proxy bypass attempt');
+          // En desarrollo esto puede ocurrir con wrangler dev
+          // En producción, Cloudflare siempre provee CF-Connecting-IP
+        } else {
+          try {
+            await checkRateLimit(env, clientIP);
+          } catch (err) {
+            if (err.message === 'RATE_LIMIT_EXCEEDED') {
+              console.warn('[Rate Limit] IP blocked:', clientIP);
+              return createErrorResponse(429, "Demasiadas solicitudes. Intenta más tarde.");
+            }
           }
         }
 
