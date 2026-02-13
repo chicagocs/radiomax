@@ -142,8 +142,7 @@ function validateOrigin(request) {
                            userAgent.includes("Insomnia");
   
   // Por ahora permitimos requests sin headers (comentar la siguiente línea para bloquearlos)
-  // return true; // Cambiar a 'return isDevelopmentTool;' para más seguridad
-  return false; // Máxima seguridad
+  return false; // Máxima seguridad > Nivel 3
 }
 
 // --- HANDLER: SPOTIFY (OPTIMIZADO Y SEGURO) ---
