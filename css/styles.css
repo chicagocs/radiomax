@@ -1408,6 +1408,42 @@ footer strong { color: var(--text-main); font-weight: bold; }
     padding: 2px; /* Un poco más chico verticalmente si solo muestra el emoji */
 }
 
+/* ==========================================================================
+   INDICADOR VISUAL DE BÚSQUEDA RÁPIDA (LETRA)
+   ========================================================================== */
+.key-search-indicator {
+    position: absolute;
+    /* Se posiciona arriba a la izquierda del contenedor padre */
+    top: -28px; 
+    left: 0;
+    
+    font-family: 'Oswald', sans-serif;
+    font-size: 22px;
+    font-weight: bold;
+    color: var(--primary);
+    
+    /* Fondo oscuro para que resalte sobre cualquier fondo */
+    background-color: var(--bg-dark);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--primary);
+    
+    /* Animación y estado inicial (oculto) */
+    opacity: 0;
+    transform: translateY(5px) scale(0.8);
+    pointer-events: none; /* No interfiere con clicks */
+    z-index: 100;
+    transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+    text-transform: uppercase; /* Siempre mayúscula */
+}
+
+/* Clase activa para mostrar el indicador */
+.key-search-indicator.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+
 @media (max-width: 500px) { .smart-link-text { display: none; } }
 
 @media (max-height: 700px) {
