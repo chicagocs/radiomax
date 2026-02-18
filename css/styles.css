@@ -1413,8 +1413,7 @@ footer strong { color: var(--text-main); font-weight: bold; }
    ========================================================================== */
 .key-search-indicator {
     position: absolute;
-    /* Se posiciona arriba a la izquierda del contenedor padre */
-    top: -28px; 
+    top: -43px; 
     left: 0;
     
     font-family: 'Oswald', sans-serif;
@@ -1422,27 +1421,35 @@ footer strong { color: var(--text-main); font-weight: bold; }
     font-weight: bold;
     color: var(--primary);
     
-    /* Fondo oscuro para que resalte sobre cualquier fondo */
     background-color: var(--bg-dark);
     padding: 2px 8px;
     border-radius: 4px;
     border: 1px solid var(--primary);
     
-    /* Animación y estado inicial (oculto) */
-    opacity: 0;
-    transform: translateY(5px) scale(0.8);
-    pointer-events: none; /* No interfiere con clicks */
+    /* --- EFECTO PARTÍCULAS / ARENA --- */
+    pointer-events: none;
     z-index: 100;
-    transition: opacity 0.15s ease-out, transform 0.15s ease-out;
-    text-transform: uppercase; /* Siempre mayúscula */
+    text-transform: uppercase;
+
+    /* Estado Inicial (Oculto): Desenfocado, grande y transparente */
+    opacity: 0;
+    transform: scale(1.5); /* Empieza más grande (disperso) */
+    filter: blur(8px);     /* Empieza desenfocado (polvo) */
+    
+    /* Transición suave para la "desintegración" */
+    transition: 
+        opacity 0.4s ease-out, 
+        transform 0.4s ease-out, 
+        filter 0.4s ease-out;
 }
 
-/* Clase activa para mostrar el indicador */
+/* Estado Visible (Aparece) */
 .key-search-indicator.visible {
+    /* Estado Final (Sólido): Nítido, tamaño normal, visible */
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: scale(1); 
+    filter: blur(0);
 }
-
 
 @media (max-width: 500px) { .smart-link-text { display: none; } }
 
