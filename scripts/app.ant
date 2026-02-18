@@ -2326,11 +2326,38 @@ document.addEventListener('DOMContentLoaded', () => {
         let lastMatchIndex = -1;
         
         document.addEventListener('keydown', function(event) {
+            // Solo actuar si el selector está cerrado y no estamos en un input
             if (!document.querySelector('.custom-select-wrapper.open') &&
                 !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName) &&
                 /^[a-zA-Z0-9]$/.test(event.key)) {
+                
                 event.preventDefault();
                 const key = event.key.toLowerCase();
+                
+                // --- NUEVO: LÓGICA DEL INDICADOR VISUAL ---
+                const wrapper = document.querySelector('.custom-select-wrapper');
+                let indicator = document.getElementById('key-search-indicator');
+                
+                // Crear el elemento si no existe
+                if (!indicator) {
+                    indicator = document.createElement('div');
+                    indicator.id = 'key-search-indicator';
+                    indicator.className = 'key-search-indicator';
+                    wrapper.appendChild(indicator);
+                }
+                
+                // Actualizar texto y mostrar
+                indicator.textContent = key.toUpperCase(); // Muestra la letra (ej: "A")
+                indicator.classList.add('visible');
+                
+                // Ocultar automáticamente después de 800ms
+                clearTimeout(wrapper.keyIndicatorTimeout); // Limpia temporizador anterior
+                wrapper.keyIndicatorTimeout = setTimeout(() => {
+                    indicator.classList.remove('visible');
+                }, 800);
+                // --- FIN LÓGICA INDICADOR ---
+
+                // Lógica original de búsqueda
                 const matches = [];
                 document.querySelectorAll('.custom-option').forEach(opt => {
                     const name = opt.querySelector('.custom-option-name').textContent.toLowerCase();
@@ -2338,6 +2365,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         matches.push(opt);
                     }
                 });
+
                 if (matches.length > 0) {
                     if (key === lastKeyPressed) {
                         lastMatchIndex = (lastMatchIndex + 1) % matches.length;
@@ -2347,25 +2375,31 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     const opt = matches[lastMatchIndex];
                     const id = opt.dataset.value;
+                    
+                    // Evitar recargar si es la misma estación
                     if (currentStation && currentStation.id === id) {
                         return;
                     }
+                    
                     stationSelect.value = id;
                     stationSelect.dispatchEvent(new Event('change'));
+                    
                     const custom = document.querySelector('.custom-select-wrapper');
                     const trig = custom.querySelector('.custom-select-trigger');
                     const st = stationsById[id];
+                    
+                    // Actualizar texto del botón
                     let txt = st.service === 'radioparadise' ? (st.name.split(' - ')[1] || st.name) : st.name;
                     trig.textContent = txt;
+                    
+                    // Actualizar selección visual
                     custom.querySelectorAll('.custom-option').forEach(o => o.classList.remove('selected'));
                     opt.classList.add('selected');
-                    opt.scrollIntoView({
-                        block: 'nearest'
-                    });
+                    opt.scrollIntoView({ block: 'nearest' });
                 }
             }
         });
-
+        
         if (volumeIcon) {
             updateVolumeIconPosition();
         }
