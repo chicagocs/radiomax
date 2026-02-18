@@ -1413,7 +1413,7 @@ footer strong { color: var(--text-main); font-weight: bold; }
    ========================================================================== */
 .key-search-indicator {
     position: absolute;
-    top: -30px; 
+    top: -32px; 
     left: 20px;
     
     font-family: 'Oswald', sans-serif;
