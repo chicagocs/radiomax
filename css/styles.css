@@ -249,6 +249,12 @@ body::-webkit-scrollbar {
     min-width: 300px;
     max-width: 520px;
     box-shadow: var(--shadow-primary);
+
+    min-height: 620px; 
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+   
 }
 
 /* Header */
@@ -1403,3 +1409,22 @@ footer strong { color: var(--text-main); font-weight: bold; }
 }
 
 @media (max-width: 500px) { .smart-link-text { display: none; } }
+
+@media (max-height: 700px) {
+    /* En pantallas bajas, permitimos que el body haga scroll si el contenido 
+       supera el min-height del contenedor */
+    body {
+        align-items: flex-start; /* Alinea arriba en lugar de centrar */
+        overflow-y: auto; /* Permite scroll vertical */
+    }
+    
+    .player-container {
+        /* Reducimos un poco el padding para ganar espacio */
+        padding: 20px 25px; 
+        margin-top: 20px;
+        margin-bottom: 80px; /* Espacio para el footer */
+        
+        /* Anulamos el min-height fijo para que se ajuste al contenido si es necesario */
+        min-height: auto; 
+    }
+}
