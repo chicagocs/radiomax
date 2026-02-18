@@ -1,17 +1,13 @@
-// app.js - v5.2 (Fix: Volume Slider input listener, SmartLink click action)
-// import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+// app.js - v6.0 (Fix: Volume Slider, SmartLink, Presence via Worker, Clock optimization)
+// Eliminado import de Supabase - ahora se usa Worker
 import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm';
 
 // ==========================================================================
-// CONFIGURACIÓN DE SUPABASE
+// CONFIGURACIÓN DEL WORKER (sin credenciales expuestas)
 // ==========================================================================
-const SUPABASE_URL = 'https://xahbzlhjolnugpbpnbmo.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_G_dlO7Q6PPT7fDQCvSN5lA_mbcqtxVl';
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-let currentChannel = null;
+const WORKER_URL = 'https://core.chcs.workers.dev';
 let currentStationId = null;
+let keepAliveInterval = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     try {
@@ -65,7 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
         let updateInterval = null;
         let countdownInterval = null;
         let isMuted = false;
-        let keepAliveInterval = null;  
         let previousVolume = 50;
         let isPlaying = false;
         let trackDuration = 0;
@@ -188,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         // ==========================================================================
-        // FUNCIONES: SUPABASE PRESENCE
+        // FUNCIONES: PRESENCE (via Worker)
         // ==========================================================================
         function getUserUniqueID() {
             let uid = localStorage.getItem('rm_uid');
@@ -198,73 +193,110 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return uid;
         }
+
         async function joinStation(stationId) {
             if (stationId === currentStationId) {
                 return;
             }
-            if (currentChannel) {
+            
+            if (currentStationId) {
                 await leaveStation(currentStationId);
             }
+            
             currentStationId = stationId;
-            const channelName = `station:${stationId}`;
-            const channel = supabase.channel(channelName, {
-                config: {
-                    presence: {
-                        key: getUserUniqueID()
-                    }
+            const userId = getUserUniqueID();
+            
+            try {
+                const response = await fetch(WORKER_URL + '/presence/join', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        stationId: stationId,
+                        userId: userId
+                    })
+                });
+                
+                if (!response.ok) {
+                    console.error('[Presence] Error al unirse:', response.status);
+                    return;
                 }
-            });
-            channel.on('presence', {
-                event: 'sync'
-            }, () => {
-                const state = channel.presenceState();
-                const count = Object.keys(state).length;
-                const counterElement = document.getElementById('totalListenersValue');
-                if (counterElement) {
-                    counterElement.textContent = String(count).padStart(5, '0');
+                
+                const data = await response.json();
+                console.log('[Presence] Unido a estación:', data);
+                
+                updateListenerCount(data.listenerCount);
+                
+                const heartbeatInterval = data.heartbeatInterval || 45;
+                if (keepAliveInterval) {
+                    clearInterval(keepAliveInterval);
                 }
-            }).subscribe(async (status) => {
-                if (status === 'SUBSCRIBED') {
-                    await channel.track({
-                        user_at: new Date().toISOString(), 
-                        agent: navigator.userAgent
-                    });
-                    if (keepAliveInterval) {
-                        clearInterval(keepAliveInterval);
-                    }
-                    keepAliveInterval = setInterval(async () => {
-                        try {
-                            await channel.track({
-                                heartbeat: true, 
-                                last_seen: new Date().toISOString()
-                            });
-                        } catch (err) {
-                            console.warn('Error heartbeat:', err);
+                
+                keepAliveInterval = setInterval(async () => {
+                    try {
+                        const hbResponse = await fetch(WORKER_URL + '/presence/heartbeat', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                stationId: stationId,
+                                userId: userId
+                            })
+                        });
+                        
+                        if (hbResponse.ok) {
+                            const hbData = await hbResponse.json();
+                            updateListenerCount(hbData.listenerCount);
                         }
-                    }, 45000);
-                }
-            });
-            currentChannel = channel;
+                    } catch (err) {
+                        console.warn('[Presence] Heartbeat error:', err);
+                    }
+                }, heartbeatInterval * 1000);
+                
+            } catch (err) {
+                console.error('[Presence] Error en joinStation:', err);
+            }
         }
+
         async function leaveStation(stationId) {
             if (keepAliveInterval) {
-                clearInterval(keepAliveInterval); 
+                clearInterval(keepAliveInterval);
                 keepAliveInterval = null;
             }
-            if (currentChannel) {
-                try {
-                    await supabase.removeChannel(currentChannel);
-                } catch (err) {
-                    if (!err.message.includes('closed')) {
-                        console.warn('Error canal (ignorado):', err);
-                    }
-                }
-                currentChannel = null; 
+            
+            if (!stationId) {
                 currentStationId = null;
-                const counterElement = document.getElementById('totalListenersValue');
-                if (counterElement) {
-                    counterElement.textContent = '00000';
-                }
+                updateListenerCount(0);
+                return;
+            }
+            
+            const userId = getUserUniqueID();
+            
+            try {
+                await fetch(WORKER_URL + '/presence/leave', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        stationId: stationId,
+                        userId: userId
+                    })
+                });
+            } catch (err) {
+                console.warn('[Presence] Error al salir:', err);
+            }
+            
+            currentStationId = null;
+            updateListenerCount(0);
+        }
+
+        function updateListenerCount(count) {
+            const counterElement = document.getElementById('totalListenersValue');
+            if (counterElement) {
+                counterElement.textContent = String(count || 0).padStart(5, '0');
             }
         }
         
@@ -285,14 +317,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 minInterval: 1000
             }
         };
+        
         function showWelcomeScreen() {
             if (welcomeScreen) welcomeScreen.style.display = 'flex'; 
             if (playbackInfo) playbackInfo.style.display = 'none';
         }
+        
         function showPlaybackInfo() {
             if (welcomeScreen) welcomeScreen.style.display = 'none'; 
             if (playbackInfo) playbackInfo.style.display = 'flex';
         }
+        
         function startTimeStuckCheck() {
             if (timeStuckCheckInterval) {
                 clearInterval(timeStuckCheckInterval);
@@ -308,6 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }, 3000);
         }
+        
         function canMakeApiCall(service) {
             const now = Date.now();
             if (now - apiCallTracker[service].lastCall >= apiCallTracker[service].minInterval) {
@@ -316,9 +352,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return false;
         }
+        
         function logErrorForAnalysis(type, details) {
             console.error(`Error logged: ${type}`, details);
         }
+        
         function updateVolumeIconPosition() {
             const sliderWidth = volumeSlider.offsetWidth;
             const percent = volumeSlider.value / volumeSlider.max;
@@ -326,6 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const newPosition = percent * sliderWidth - (iconWidth / 2);
             volumeIcon.style.left = `${newPosition}px`;
         }
+        
         function updateTooltipPosition() {
             const referenceEl = document.getElementById('trackCredits');
             const tooltipEl = document.getElementById('tooltip-credits');
@@ -353,6 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
         }
+        
         function updateShareButtonVisibility() {
             const title = songTitle.textContent; 
             const artist = songArtist.textContent;
@@ -363,6 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 shareOptions.classList.remove('active');
             }
         }
+        
         function showNotification(message) {
             if (notification) {
                 notification.textContent = message; 
@@ -381,11 +422,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 playBtn.textContent = '▶ PAUSAR';               
                 playBtn.classList.add('playing');
                 playBtn.classList.remove('paused');
+                playBtn.setAttribute('aria-pressed', 'true');
             } else {
                 playBtn.textContent = '▶ SONAR';
-                
                 playBtn.classList.remove('playing');
                 playBtn.classList.add('paused');
+                playBtn.setAttribute('aria-pressed', 'false');
             }
         }
         
@@ -420,10 +462,12 @@ document.addEventListener('DOMContentLoaded', () => {
             installPwaInvitation.style.display = 'flex'; 
             installInvitationTimeout = true;
         }
+        
         function hideInstallInvitation() {
             installPwaInvitation.style.display = 'none'; 
             localStorage.setItem('rm_pwa_invite_dismissed', 'true');
         }
+        
         function attemptResumePlayback() {
             if (wasPlayingBeforeFocusLoss && !isPlaying && currentStation) {
                 setTimeout(() => {
@@ -442,9 +486,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, 1000);
             }
         }
+        
         function isFacebookActive() {
             return document.visibilityState === 'visible' && document.hasFocus() && wasPlayingBeforeFocusLoss && !isPlaying && currentStation;
         }
+        
         function startFacebookDetection() {
             if (pageFocusCheckInterval) {
                 clearInterval(pageFocusCheckInterval);
@@ -455,6 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }, 2000);
         }
+        
         function checkAudioContext() {
             if (!audioPlayer.paused && isPlaying) {
                 lastAudioContextTime = Date.now();
@@ -465,6 +512,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 lastAudioContextTime = audioPlayer.currentTime;
             }
         }
+        
         function startAudioContextCheck() {
             if (audioContextCheckInterval) {
                 clearInterval(audioContextCheckInterval);
@@ -475,10 +523,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }, 3000);
         }
+        
         function startPlaybackChecks() {
             startFacebookDetection(); 
             startAudioContextCheck();
         }
+        
         function stopPlaybackChecks() {
             if (pageFocusCheckInterval) {
                 clearInterval(pageFocusCheckInterval); 
@@ -492,9 +542,47 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // ==========================================================================
+        // RELOJ (Optimizado con requestAnimationFrame)
+        // ==========================================================================
+        function initClock() {
+            const clockElement = document.getElementById('currentTime');
+            if (!clockElement) return;
+            
+            let lastTime = ''; 
+
+            function update() {
+                const now = new Date();
+                
+                const h = String(now.getHours()).padStart(2, '0');
+                const m = String(now.getMinutes()).padStart(2, '0');
+                const s = String(now.getSeconds()).padStart(2, '0');
+                
+                const offset = -now.getTimezoneOffset();
+                const sign = offset >= 0 ? '+' : '-';
+                const hrs = Math.floor(Math.abs(offset) / 60);
+                const mins = Math.abs(offset) % 60;
+                const gmt = mins > 0 
+                    ? 'GMT' + sign + hrs + ':' + String(mins).padStart(2, '0')
+                    : 'GMT' + sign + hrs;
+                    
+                const timeString = h + ':' + m + ':' + s + ' (' + gmt + ')';
+
+                if (lastTime !== timeString) {
+                    clockElement.textContent = timeString;
+                    lastTime = timeString;
+                }
+
+                requestAnimationFrame(update);
+            }
+
+            requestAnimationFrame(update);
+        }
+
+        // ==========================================================================
         // GESTIÓN DE FAVORITOS
         // ==========================================================================
         const FAVORITES_KEY = 'radioMax_favorites';
+        
         function getFavorites() {
             try {
                 return JSON.parse(localStorage.getItem(FAVORITES_KEY)) || [];
@@ -502,13 +590,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 return [];
             }
         }
+        
         function saveFavorites(list) {
             try {
                 localStorage.setItem(FAVORITES_KEY, JSON.stringify(list));
             } catch (e) {}
         }
+        
         function updateFavoriteButtonUI(id, fav) {
-            const btn = document.querySelector(`.favorite-btn[data-station-id="${id}"]`);
+            const btn = document.querySelector('.favorite-btn[data-station-id="' + id + '"]');
             if (!btn) {
                 return;
             }
@@ -516,13 +606,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (fav) {
                 btn.innerHTML = '★'; 
                 btn.classList.add('is-favorite'); 
-                btn.setAttribute('aria-label', `Quitar ${name} de favoritos`);
+                btn.setAttribute('aria-label', 'Quitar ' + name + ' de favoritos');
             } else {
                 btn.innerHTML = '☆'; 
                 btn.classList.remove('is-favorite'); 
-                btn.setAttribute('aria-label', `Añadir ${name} a favoritos`);
+                btn.setAttribute('aria-label', 'Añadir ' + name + ' a favoritos');
             }
         }
+        
         function addFavorite(id) {
             let favs = getFavorites(); 
             if (!favs.includes(id)) {
@@ -532,12 +623,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 showNotification('Estación añadida');
             }
         }
+        
         function removeFavorite(id) {
             let favs = getFavorites().filter(fid => fid !== id); 
             saveFavorites(favs); 
             updateFavoriteButtonUI(id, false); 
             showNotification('Estación eliminada');
         }
+        
         function filterStationsByFavorites() {
             const favs = getFavorites();
             document.querySelectorAll('.custom-option').forEach(opt => {
@@ -556,6 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 label.style.display = has ? 'block' : 'none';
             });
         }
+        
         function showAllStations() {
             document.querySelectorAll('.custom-option, .custom-optgroup-label').forEach(el => el.style.display = '');
         }
@@ -651,7 +745,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 favBtn.className = 'favorite-btn'; 
                 favBtn.innerHTML = '☆'; 
                 favBtn.dataset.stationId = option.value; 
-                favBtn.setAttribute('aria-label', `Añadir ${name} a favoritos`);
+                favBtn.setAttribute('aria-label', 'Añadir ' + name + ' a favoritos');
                 favBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const sid = e.target.dataset.stationId;
@@ -769,6 +863,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             img.src = url;
         }
+        
         function displayAlbumCover(img) {
             albumCover.innerHTML = '';
             const displayImg = document.createElement('img');
@@ -777,10 +872,11 @@ document.addEventListener('DOMContentLoaded', () => {
             displayImg.classList.add('loaded');
             albumCover.appendChild(displayImg);
         }
+        
         function resetAlbumCover() {
             albumCover.innerHTML = `
                 <div class="album-cover-placeholder">
-                    <svg viewBox="0 0 640 640" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                    <svg viewBox="0 0 640 640" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                         <defs>
                             <filter id="glow">
                                 <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
@@ -811,7 +907,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const res = await fetch('/stations.json');
                 if (!res.ok) {
-                    throw new Error(`HTTP error! status: ${res.status}`);
+                    throw new Error('HTTP error! status: ' + res.status);
                 }
                 const allStations = await res.json();
                 const grouped = allStations.reduce((acc, s) => {
@@ -914,6 +1010,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showOnlyFavorites = !showOnlyFavorites;
                 this.classList.toggle('active', showOnlyFavorites);
                 this.setAttribute('aria-label', showOnlyFavorites ? 'Mostrar todas' : 'Solo favoritas');
+                this.setAttribute('aria-pressed', showOnlyFavorites ? 'true' : 'false');
                 this.title = showOnlyFavorites ? 'Todas las estaciones' : 'Solo estaciones favoritas';
                 if (showOnlyFavorites) {
                     filterStationsByFavorites();
@@ -945,8 +1042,8 @@ document.addEventListener('DOMContentLoaded', () => {
             volumeSlider.addEventListener('input', () => {
                 updateVolumeIconPosition();
                 if (audioPlayer) {
-                    // Ajustar volumen real (0 a 1)
                     audioPlayer.volume = volumeSlider.value / volumeSlider.max;
+                    volumeSlider.setAttribute('aria-valuenow', volumeSlider.value);
                 }
             });
         }
@@ -972,7 +1069,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (currentStation) {
                         playStation();
                     } else {
-                        alert('Por favor, seleccionar una estación');
+                        showNotification('Por favor, seleccionar una estación');
                     }
                 }
             });
@@ -1000,6 +1097,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearInterval(rapidCheckInterval); 
                 rapidCheckInterval = null;
             }
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
             currentTrackInfo = null; 
             trackDuration = 0; 
             trackStartTime = 0;
@@ -1023,7 +1124,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         async function playStation() {
             if (!currentStation) {
-                alert('Por favor, seleccionar una estación'); 
+                showNotification('Por favor, seleccionar una estación'); 
                 return;
             }
             const thisPlayId = ++currentPlayPromiseId;
@@ -1057,7 +1158,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const newTrack = {
                         title: currentStation.name, 
                         artist: currentStation.description, 
-                        album: `Emisión del ${extractDateFromUrl(currentStation.url)}`
+                        album: 'Emisión del ' + extractDateFromUrl(currentStation.url)
                     };
                     currentTrackInfo = newTrack; 
                     updateUIWithTrackInfo(newTrack);
@@ -1109,7 +1210,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function extractDateFromUrl(url) {
             const m = url.match(/nrk_radio_klassisk_natt_(\d{8})_/);
-            return m ? `${m[1].substring(6, 8)}-${m[1].substring(4, 6)}-${m[1].substring(0, 4)}` : 'Fecha desconocida';
+            return m ? m[1].substring(6, 8) + '-' + m[1].substring(4, 6) + '-' + m[1].substring(0, 4) : 'Fecha desconocida';
         }
 
         async function updateSongInfo(bypassRateLimit = false) {
@@ -1134,7 +1235,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const res = await fetch('https://api.somafm.com/songs/' + currentStation.id + '.json');
                 if (!res.ok) {
-                    throw new Error(`HTTP error! status: ${res.status}`);
+                    throw new Error('HTTP error! status: ' + res.status);
                 }
                 const data = await res.json();
                 if (data.songs && data.songs.length > 0) {
@@ -1157,20 +1258,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         startCountdown();
                         const fetchId = Date.now() + Math.random();
                         currentSongFetchId = fetchId;
-                        {
-                            // Bloque seguro para fetch
-                            fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId)
-                                .catch(e => console.error("Error fetchSongDetails (background):", e));
-                        }
+                        fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId)
+                            .catch(e => console.error("Error fetchSongDetails (background):", e));
                         if (rapidCheckInterval) {
                             clearInterval(rapidCheckInterval); 
                             rapidCheckInterval = null;
                         }
                         songTransitionDetected = true;
                     }
-                     } else {
-                       // resetUI();
-                       }
+                }
             } catch (e) {
                 logErrorForAnalysis('SomaFM error', {
                     error: e.message, 
@@ -1200,7 +1296,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const u = w + '?url=' + encodeURIComponent(p);
                 const res = await fetch(u);
                 if (!res.ok) {
-                    throw new Error(`HTTP error! status: ${res.status}`);
+                    throw new Error('HTTP error! status: ' + res.status);
                 }
                 const d = await res.json();
                 const newTrack = {
@@ -1225,11 +1321,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     startCountdown();
                     const fetchId = Date.now() + Math.random();
                     currentSongFetchId = fetchId;
-                    {
-                        // Bloque seguro para fetch
-                        fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId)
-                            .catch(e => console.error("Error fetchSongDetails (background):", e));
-                    }
+                    fetchSongDetails(newTrack.artist, newTrack.title, newTrack.album, fetchId)
+                        .catch(e => console.error("Error fetchSongDetails (background):", e));
                     if (rapidCheckInterval) {
                         clearInterval(rapidCheckInterval); 
                         rapidCheckInterval = null;
@@ -1285,11 +1378,10 @@ document.addEventListener('DOMContentLoaded', () => {
             let spotifyUrl = '';
 
             try {
-                // Retipado manual para evitar caracteres ocultos
                 const u = 'https://core.chcs.workers.dev/spotify?artist=' + encodeURIComponent(sA) + '&title=' + encodeURIComponent(sT) + '&album=' + encodeURIComponent(sAl);
                 const res = await fetch(u);
                 if (!res.ok) {
-                    throw new Error(`HTTP error! status: ${res.status}`);
+                    throw new Error('HTTP error! status: ' + res.status);
                 }
                 const d = await res.json();
                 
@@ -1325,7 +1417,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
-                // Llamada segura con argumentos separados
                 getMusicBrainzDuration(
                     sA, 
                     sT, 
@@ -1410,12 +1501,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const searchArtist = spotifyArtist ? spotifyArtist : artist;
                 const searchTitle = spotifyTitle ? spotifyTitle : title;
                 const cleanTitle = searchTitle.replace(/\([^)]*\)/g, '').trim();
-                // Retipado manual
                 const searchUrl = 'https://musicbrainz.org/ws/2/recording/?query=artist:"' + encodeURIComponent(searchArtist) + '" AND recording:"' + encodeURIComponent(cleanTitle) + '"&fmt=json&limit=5';
                 
                 const res = await fetch(searchUrl);
                 if (!res.ok) {
-                    throw new Error(`HTTP error! status: ${res.status}`);
+                    throw new Error('HTTP error! status: ' + res.status);
                 }
                 const d = await res.json();
                 
@@ -1507,7 +1597,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const sortedRoles = Object.keys(roleMap).sort((a, b) => a.localeCompare(b, 'es'));
             return sortedRoles.map(role => {
                 const names = roleMap[role].join(', ');
-                return `<div><b>${role}</b> ${names}</div>`;
+                return '<div><b>' + role + '</b> ' + names + '</div>';
             }).join(''); 
         }
             
@@ -1555,6 +1645,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             return translations[lowerRole] || capitalize(role);
         }
+        
         function capitalize(s) {
             if (typeof s !== 'string') {
                 return '';
@@ -1574,7 +1665,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const y = d.release_date.substring(0, 4);
                 let t = y;
                 if (d.albumTypeDescription && d.albumTypeDescription !== 'Álbum') {
-                    t += ` (${d.albumTypeDescription})`;
+                    t += ' (' + d.albumTypeDescription + ')';
                 }
                 el.textContent = t;
             } else if (el) {
@@ -1612,7 +1703,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             if (d.trackNumber && d.totalTracks) {
-                trackPosition.textContent = `Track ${d.trackNumber}/${d.totalTracks}`;
+                trackPosition.textContent = 'Track ' + d.trackNumber + '/' + d.totalTracks;
             } else {
                 trackPosition.textContent = '--/--';
             }
@@ -1637,7 +1728,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function updateUIWithTrackInfo(t) {
             if (songTitle.textContent !== t.title) songTitle.textContent = t.title;
             if (songArtist.textContent !== t.artist) songArtist.textContent = t.artist;
-            const albumText = t.album ? `(${t.album})` : '';
+            const albumText = t.album ? '(' + t.album + ')' : '';
             if (songAlbum.textContent !== albumText) songAlbum.textContent = albumText;
             updateShareButtonVisibility();
         }
@@ -1762,7 +1853,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     const m = Math.floor(d / 60);
                     const s = Math.floor(d % 60);
-                    displayText = '+' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+                    displayText = '-' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
                     lastCheckedSecond = -1; 
                     if (d < 10) {
                         countdownTimer.classList.add('ending'); 
@@ -1795,7 +1886,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const trackCredits = document.getElementById('trackCredits');
             if (trackCredits) {
                 trackCredits.textContent = '--';
-                trackCredits.title = ''; 
                 trackCredits.title = ''; 
                 trackCredits.style.borderBottom = 'none'; 
                 currentCredits = ""; 
@@ -1858,30 +1948,19 @@ document.addEventListener('DOMContentLoaded', () => {
         // ==========================================================================
         if (smartLinkButton) {
             smartLinkButton.addEventListener('click', (e) => {
-                // Prevenimos comportamientos por defecto si el botón está dentro de un formulario o link
                 e.preventDefault(); 
                 
                 if (currentSpotifyUrl && currentSpotifyUrl !== "NO_URL") {
                     try {
-                        // Creamos un elemento <a> temporal
                         const link = document.createElement('a');
                         link.href = currentSpotifyUrl;
-                        // Forzamos apertura en nueva ventana/pestaña
                         link.target = '_blank'; 
-                        // Atributos de seguridad para no exponer la ventana actual
                         link.rel = 'noopener noreferrer';
-                        
-                        // Lo agregamos al DOM (necesario para algunos navegadores móviles)
                         document.body.appendChild(link);
-                        
-                        // Simulamos el clic
                         link.click();
-                        
-                        // Eliminamos el elemento temporal
                         document.body.removeChild(link);
                     } catch (err) {
                         console.error("Error al abrir smartlink:", err);
-                        // Fallback por si falla la simulación del clic
                         window.open(currentSpotifyUrl, '_blank');
                     }
                 } else {
@@ -1996,6 +2075,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 connectionManager.attemptReconnect();
             }
         });
+        
         window.addEventListener('offline', () => {});
 
         if ('mediaSession' in navigator) {
@@ -2105,6 +2185,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (installPwaBtnIos) installPwaBtnIos.style.display = 'none';
             }
         }
+        
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault(); 
             deferredPrompt = e; 
@@ -2126,21 +2207,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 deferredPrompt = null;
             });
         }
+        
         if (installPwaBtnIos) {
             installPwaBtnIos.addEventListener('click', (e) => {
                 e.preventDefault(); 
                 showNotification('Para instalar en iOS: Pulsa el botón <strong>Compartir</strong> y luego <strong>Añadir a pantalla de inicio</strong>.');
             });
         }
+        
         setTimeout(showInstallPwaButtons, 1000);
 
         if (shareButton) { 
             shareButton.addEventListener('click', () => { 
-                shareOptions.classList.toggle('active'); 
+                shareOptions.classList.toggle('active');
+                shareButton.setAttribute('aria-expanded', shareOptions.classList.contains('active') ? 'true' : 'false');
             });
             document.addEventListener('click', (e) => { 
                 if (shareButton && shareOptions && !shareButton.contains(e.target) && !shareOptions.contains(e.target)) {
-                    shareOptions.classList.remove('active'); 
+                    shareOptions.classList.remove('active');
+                    shareButton.setAttribute('aria-expanded', 'false');
                 }
             });
         }
@@ -2153,7 +2238,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const baseUrl = window.location.origin;
                     const stationParam = currentStation ? '?station=' + currentStation.id : '';
                     const fullUrl = baseUrl + stationParam;
-                    // Uso de concatenación simple para máxima seguridad
                     const mensaje = 'Escuche ' + title + ' de ' + artist + ' en ' + fullUrl + ' - Temazo en RadioMax';
                     const isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
                     const isBrave = isMob && /Brave/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
@@ -2240,6 +2324,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let lastKeyPressed = null; 
         let lastMatchIndex = -1;
+        
         document.addEventListener('keydown', function(event) {
             if (!document.querySelector('.custom-select-wrapper.open') &&
                 !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName) &&
@@ -2290,7 +2375,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fetch('/sw.js')
                 .then(r => {
                     if (!r.ok) {
-                        throw new Error(`HTTP error! status: ${r.status}`);
+                        throw new Error('HTTP error! status: ' + r.status);
                     } 
                     return r.text();
                 })
@@ -2383,9 +2468,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateTooltipPosition(); 
                 tooltipEl.style.opacity = '1';
                 tooltipEl.style.visibility = 'visible';
+                tooltipEl.setAttribute('aria-hidden', 'false');
             };
             const hideTooltip = () => {
                 tooltipEl.style.opacity = '0';
+                tooltipEl.setAttribute('aria-hidden', 'true');
                 setTimeout(() => {
                     if (tooltipEl.style.opacity === '0') {
                         tooltipEl.style.visibility = 'hidden';
@@ -2397,6 +2484,11 @@ document.addEventListener('DOMContentLoaded', () => {
             trackCredits.addEventListener('focus', showTooltip);
             trackCredits.addEventListener('blur', hideTooltip);
         }
+
+        // ==========================================================================
+        // INICIALIZACIÓN DEL RELOJ (Optimizado con requestAnimationFrame)
+        // ==========================================================================
+        initClock();
 
         // ==========================================================================
         // FIN TRY...CATCH
