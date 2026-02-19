@@ -723,7 +723,7 @@ body::-webkit-scrollbar {
 .controls {
     display: flex;
     flex-direction: row;
-    gap: 15px;
+    gap: 10px;  // 000 15px
     margin-bottom: 15px;  // 000 20px
 }
 
