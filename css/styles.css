@@ -319,7 +319,7 @@ body::-webkit-scrollbar {
 
 /* Selector de Estaciones */
 .station-selector {
-    margin-bottom: 15px; // 000 20px
+    margin-bottom: 15px; /* Antes 20px */
     position: relative;
 }
 .station-selector select { display: none; }
@@ -522,7 +522,7 @@ body::-webkit-scrollbar {
 .now-playing-container {
     display: flex;
     gap: 15px;
-    margin-bottom: 10px; // 000 20px
+    margin-bottom: 20px;
     align-items: stretch;
 }
 
@@ -723,15 +723,16 @@ body::-webkit-scrollbar {
 .controls {
     display: flex;
     flex-direction: row;
-    gap: 10px;  // 000 15px
-    margin-bottom: 15px;  // 000 20px
+    gap: 10px;
+    margin-bottom: 15px;  /* Antes 20px */
+    margin-top: 15px; /* Antes no estaba esta linea */
 }
 
 .countdown-container {
     display: flex;
     flex-direction: row;
     gap: 6px;
-    margin: 5px 0;  // 000 17px 0
+    margin: 5px 0;  /* Antes 17px 0 */
     padding: 5px 30px 5px 5px;
     background: linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-surface) 100%);
     border: 1px solid var(--primary);
@@ -1283,7 +1284,7 @@ footer strong { color: var(--text-main); font-weight: bold; }
     .countdown-timer-column { width: 100px; }
     .details-value { font-size: 11px; }
     .song-title, .song-artist, .song-album { font-size: 14px; }
-    .station-selector { margin-bottom: 15px; } // 000 25px
+    .station-selector { margin-bottom: 15px; } /* Antes 25px */
     .station-tags { gap: 4px; margin-top: 8px; }
     .station-tag { font-size: 11px; padding: 1px 4px; }
   
