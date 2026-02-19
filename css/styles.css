@@ -724,7 +724,7 @@ body::-webkit-scrollbar {
     display: flex;
     flex-direction: row;
     gap: 15px;
-    margin-bottom: 10px;  // 000 10px
+    margin-bottom: 15px;  // 000 20px
 }
 
 .countdown-container {
