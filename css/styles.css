@@ -1283,7 +1283,7 @@ footer strong { color: var(--text-main); font-weight: bold; }
     .countdown-timer-column { width: 100px; }
     .details-value { font-size: 11px; }
     .song-title, .song-artist, .song-album { font-size: 14px; }
-    .station-selector { margin-bottom: 25px; }
+    .station-selector { margin-bottom: 15px; } // 000 25px
     .station-tags { gap: 4px; margin-top: 8px; }
     .station-tag { font-size: 11px; padding: 1px 4px; }
   
