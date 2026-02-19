@@ -319,7 +319,7 @@ body::-webkit-scrollbar {
 
 /* Selector de Estaciones */
 .station-selector {
-    margin-bottom: 30px;
+    margin-bottom: 10px; // 000 20px
     position: relative;
 }
 .station-selector select { display: none; }
