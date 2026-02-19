@@ -282,10 +282,9 @@ body::-webkit-scrollbar {
     text-align: center;
 }
 
-/* ✨ Cinta de favoritos */
 #filterToggleStar {
   position: absolute;
-  top: -18px;
+  top: -24px;
   right: 0;
   width: 2.6rem;
   height: 2.6rem;
