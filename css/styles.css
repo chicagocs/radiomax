@@ -522,7 +522,7 @@ body::-webkit-scrollbar {
 .now-playing-container {
     display: flex;
     gap: 15px;
-    margin-bottom: 20px;
+    margin-bottom: 10px; // 000 20px
     align-items: stretch;
 }
 
@@ -724,14 +724,14 @@ body::-webkit-scrollbar {
     display: flex;
     flex-direction: row;
     gap: 15px;
-    margin-bottom: 20px;
+    margin-bottom: 10px;  // 000 10px
 }
 
 .countdown-container {
     display: flex;
     flex-direction: row;
     gap: 6px;
-    margin: 17px 0;
+    margin: 5px 0;  // 000 17px 0
     padding: 5px 30px 5px 5px;
     background: linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-surface) 100%);
     border: 1px solid var(--primary);
