@@ -65,8 +65,7 @@ body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif, 'Arial Unicode MS';
     display: flex;
     justify-content: center;
-    align-items: flex-start; /* center; */
-    padding-top: 0px;
+    align-items: center; /* flex-start; */
    
     min-height: 100vh;
     padding: 20px;
