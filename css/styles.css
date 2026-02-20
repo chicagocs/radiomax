@@ -67,7 +67,7 @@ body {
     justify-content: center;
     align-items: center; /* flex-start; */   
     min-height: 100vh;
-    padding: 20px;
+    padding: 15px;
     padding-bottom: 0px;
     padding-top: 0px;
     overflow: hidden;
