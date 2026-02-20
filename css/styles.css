@@ -68,7 +68,7 @@ body {
     align-items: center; /* flex-start; */   
     min-height: 100vh;
     padding: 20px;
-    padding-bottom: 60px;
+    padding-bottom: 0px;
     overflow: hidden;
 }
 
