@@ -69,6 +69,7 @@ body {
     min-height: 100vh;
     padding: 20px;
     padding-bottom: 0px;
+    padding-top: 0px;
     overflow: hidden;
 }
 
