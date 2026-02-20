@@ -249,12 +249,11 @@ body::-webkit-scrollbar {
     min-width: 300px;
     max-width: 520px;
     box-shadow: var(--shadow-primary);
-
     min-height: 620px; 
     display: flex;
     flex-direction: column;
     justify-content: center;
-   
+    margin-top: 20px;
 }
 
 /* Header */
