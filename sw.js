@@ -1,5 +1,5 @@
-// v4.71 <- Incrementar versión cada vez que haya cambios para forzar la actualización
-const CACHE_VERSION = 'v4.71';
+// v4.70 <- Incrementar versión cada vez que haya cambios para forzar la actualización
+const CACHE_VERSION = 'v4.70';
 const STATIC_CACHE = `max-static-${CACHE_VERSION}`;
 const API_CACHE = `max-api-${CACHE_VERSION}`;
 
