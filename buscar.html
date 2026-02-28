@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscador de Productos - GestionResellers</title>
+    <style>
+        /* Estilos básicos para que se vea limpio y moderno */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f6f8;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 12px 25px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        /* Tabla de resultados */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+
+        .price {
+            font-weight: bold;
+            color: #28a745;
+        }
+
+        .loading {
+            text-align: center;
+            display: none;
+            color: #666;
+        }
+
+        .error {
+            color: red;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🔍 Buscador de Productos</h1>
+    
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Ej: Monitor, iPhone, Memoria RAM...">
+        <button onclick="buscarProductos()">Buscar</button>
+    </div>
+
+    <div id="errorMsg" class="error"></div>
+    <div id="loading" class="loading">Cargando productos...</div>
+
+    <div id="resultsContainer">
+        <!-- Aquí aparecerán los resultados -->
+        <table id="resultsTable" style="display:none;">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Descripción</th>
+                    <th>Stock</th>
+                    <th>Precio</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // ==========================================================================
+    // CONFIGURACIÓN (SEGÚN TU PDF)
+    // ==========================================================================
+    
+    // 1. REEMPLAZA ESTO con la URL que indica el PDF (ej: https://api.gestionresellers.com.ar/v1/productos)
+    const API_URL = 'AQUI_LA_URL_DEL_API_DEL_PDF'; 
+    
+    // 2. REEMPLAZA ESTO con tu Token de autorización si es necesario
+    const API_TOKEN = 'TU_TOKEN_AQUI'; 
+
+    // ==========================================================================
+    // LÓGICA DE BÚSQUEDA
+    // ==========================================================================
+
+    async function buscarProductos() {
+        const input = document.getElementById('searchInput').value;
+        const tableBody = document.getElementById('tableBody');
+        const table = document.getElementById('resultsTable');
+        const loading = document.getElementById('loading');
+        const errorMsg = document.getElementById('errorMsg');
+
+        // Limpiar estados anteriores
+        errorMsg.textContent = '';
+        tableBody.innerHTML = '';
+        table.style.display = 'none';
+
+        if (!input.trim()) {
+            errorMsg.textContent = 'Por favor, escribe un término de búsqueda.';
+            return;
+        }
+
+        loading.style.display = 'block';
+
+        try {
+            // Nota: La estructura de headers puede variar según el PDF.
+            // A veces es 'Authorization: Bearer TOKEN', a veces 'token', etc.
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            // Si el PDF indica que se requiere token, descomenta y ajusta la siguiente línea:
+            // headers['Authorization'] = `Bearer ${API_TOKEN}`;
+
+            // Realizar la petición (GET)
+            // Asumimos que el API acepta parámetros query ?search= o ?q=
+            // Si el PDF indica que se envía por POST, habría que cambiar el método.
+            const response = await fetch(`${API_URL}?search=${encodeURIComponent(input)}`, {
+                method: 'GET',
+                headers: headers
+            });
+
+            if (!response.ok) {
+                throw new Error(`Error del servidor: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            loading.style.display = 'none';
+
+            // ==========================================================
+            // ADAPTACIÓN DE DATOS (IMPORTANTE)
+            // ==========================================================
+            // Los nombres de los campos dependen de lo que diga el PDF.
+            // Ajusta 'item.descripcion', 'item.precio', etc. según tu documentación.
+            
+            if (data && data.length > 0) { // Suponiendo que devuelve un array directo
+                table.style.display = 'table';
+                
+                data.forEach(item => {
+                    const row = document.createElement('tr');
+                    
+                    // Ajusta estos campos según el JSON real del PDF
+                    row.innerHTML = `
+                        <td>${item.codigo || item.id || 'N/A'}</td>
+                        <td>${item.descripcion || item.nombre || 'Sin nombre'}</td>
+                        <td>${item.stock || '0'}</td>
+                        <td class="price">$${item.precio || '0.00'}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            } else {
+                errorMsg.textContent = 'No se encontraron productos para esta búsqueda.';
+            }
+
+        } catch (error) {
+            loading.style.display = 'none';
+            console.error(error);
+            errorMsg.textContent = 'Hubo un error al conectar con el servicio. Verifica la URL del API en el código.';
+        }
+    }
+
+    // Permitir buscar presionando Enter
+    document.getElementById('searchInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+            buscarProductos();
+        }
+    });
+</script>
+
+</body>
+</html>
