@@ -5,14 +5,16 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     
-    <!-- 🔐 Content Security Policy - PERMISIVA PARA FUNCIONAMIENTO -->
-    <!-- Nota: Si usas headers HTTP desde el Worker, esta meta tag se ignora. 
-         Asegúrate de que el Worker envíe la misma política en headers. -->
+    <!-- 🔐 Content Security Policy - VERSIÓN CORREGIDA -->
+    <!-- Nota: frame-ancestors se ignora en meta tags; se aplica vía headers HTTP del Worker -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'none';
-        script-src 'self' 'unsafe-inline' https://core.chcs.workers.dev https://static.cloudflareinsights.com;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' 
+            https://core.chcs.workers.dev 
+            https://static.cloudflareinsights.com 
+            https://cdn.jsdelivr.net;
         worker-src 'self' blob:;
-        style-src 'self' 'unsafe-inline';
+        style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
         img-src 'self' data: https:;
         connect-src 'self' 
             https://core.chcs.workers.dev 
@@ -24,11 +26,10 @@
             https://i.scdn.co 
             https://image-cdn-ak.spotifycdn.com 
             https://e-cdns-images.dzcdn.net;
-        font-src 'self' data:;
+        font-src 'self' https:;
         manifest-src 'self';
         base-uri 'self';
         form-action 'self';
-        frame-ancestors 'none';
         upgrade-insecure-requests;
     ">
     
@@ -39,12 +40,13 @@
     <meta name="theme-color" content="#000000">
     <meta name="author" content="RadioMax">
     
-    <!-- Preconnect a dominios críticos para mejorar performance -->
+    <!-- Preconnect a dominios críticos -->
     <link rel="preconnect" href="https://core.chcs.workers.dev" crossorigin>
     <link rel="preconnect" href="https://i.scdn.co" crossorigin>
     <link rel="preconnect" href="https://api.somafm.com" crossorigin>
     <link rel="preconnect" href="https://api.radioparadise.com" crossorigin>
     <link rel="preconnect" href="https://musicbrainz.org" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="dns-prefetch" href="https://musicbrainz.org">
     
     <link rel="manifest" href="/site.webmanifest">
@@ -57,13 +59,13 @@
     <link rel="icon" type="image/png" sizes="96x96" href="/images/favicon-96x96.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
     
-    <!-- ✅ Web App Capable (estándar moderno + fallback para iOS) -->
+    <!-- Web App Capable -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="RadioMax">
 
-    <!-- Open Graph / Facebook -->
+    <!-- Open Graph -->
     <meta property="og:title" content="RadioMax, una experiencia inmersiva">
     <meta property="og:description" content="RadioMax, disfruta de una experiencia inmersiva con la mejor música las 24 horas. ¡Escucha gratis ahora!">
     <meta property="og:image" content="https://radiomax.tramax.com.ar/images/radiomax-social-card-1200x630.jpg">
@@ -84,7 +86,7 @@
     <meta name="twitter:image" content="https://radiomax.tramax.com.ar/images/radiomax-social-card-1200x630.jpg">
     <meta name="twitter:image:alt" content="Logo de RadioMax">
 
-    <!-- Structured Data (JSON-LD) -->
+    <!-- Structured Data -->
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",
@@ -117,7 +119,6 @@
     }
     </script>
 
-    <!-- Estilos principales -->
     <link rel="stylesheet" href="/css/styles.css">
     
 </head>
@@ -348,10 +349,8 @@
         </div>
     </div>
       
-    <!-- Script principal (module para soporte de import/export) -->
     <script type="module" src="/scripts/app.js" defer></script>
     
-    <!-- Notificaciones globales -->
     <div id="notification" class="notification" role="status" aria-live="polite"></div>
     
 </body>
