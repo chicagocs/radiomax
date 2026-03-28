@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const albumTrackCount = document.getElementById('albumTrackCount');
         const albumTotalDuration = document.getElementById('albumTotalDuration');
         const trackGenre = document.getElementById('trackGenre');
-        const trackPosition = document.getElementById('trackPosition');
+        // trackPosition eliminado del HTML — variable removida
         const trackIsrc = document.getElementById('trackIsrc');
         const shareButton = document.getElementById('shareButton');
         const shareOptions = document.getElementById('shareOptions');
@@ -1507,12 +1507,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 trackGenre.textContent = '--';
             }
             
-            if (d.trackNumber && d.totalTracks) {
-                trackPosition.textContent = 'Track ' + d.trackNumber + '/' + d.totalTracks;
-            } else {
-                trackPosition.textContent = '--/--';
-            }
-            
+            // trackPosition eliminado — bloque removido
+
             if (trackIsrc) {
                 if (d.isrc && d.isrc.trim() !== '') {
                     trackIsrc.textContent = d.isrc.toUpperCase(); 
@@ -1566,10 +1562,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             trackDuration = 0; 
             trackStartTime = 0;
-            countdownTimer.textContent = '--:--';
-            totalDuration.textContent = '(--:--)';
-            trackPosition.textContent = '--/--';
-            countdownTimer.classList.remove('ending');
+            if (countdownTimer) countdownTimer.textContent = '--:--';
+            if (totalDuration) totalDuration.textContent = '(--:--)';
+            // trackPosition eliminado — línea removida
+            if (countdownTimer) countdownTimer.classList.remove('ending');
             songTransitionDetected = false;
         }
 
@@ -1687,7 +1683,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             albumTotalDuration.textContent = '--:--';
             trackGenre.textContent = '--';
-            trackPosition.textContent = '--/--';
+            // trackPosition eliminado — línea removida
             const trackCredits = document.getElementById('trackCredits');
             if (trackCredits) {
                 trackCredits.textContent = '--';
