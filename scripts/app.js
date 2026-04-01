@@ -1,5 +1,4 @@
-// app.js - v6.0 (Fix: Volume Slider, Presence via Worker, Clock optimization)
-// Eliminado import de Supabase - ahora se usa Worker
+// app.js - v6.0 (Fix: Volume Slider, Presence via Worker, Clock optimization — SmartLink removed)
 import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm';
 
 // ==========================================================================
@@ -1272,7 +1271,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 getMusicBrainzCredits(sA, sT, d?.isrc || null, fetchId);
                 
             } catch (e) {
-                logErrorForAnalysis('Last.fm error', {
+                logErrorForAnalysis('Spotify/Worker error', {
                     error: e.message, 
                     artist: sA, 
                     title: sT, 
