@@ -1,4 +1,4 @@
-// app.js - v6.0 (Fix: Volume Slider, Presence via Worker, Clock optimization — SmartLink removed)
+// app.js
 import {computePosition, offset, flip} from 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm';
 
 // ==========================================================================
@@ -32,10 +32,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const albumTrackCount = document.getElementById('albumTrackCount');
         const albumTotalDuration = document.getElementById('albumTotalDuration');
         const trackGenre = document.getElementById('trackGenre');
+        // trackPosition eliminado del HTML — variable removida
         const trackIsrc = document.getElementById('trackIsrc');
         const shareButton = document.getElementById('shareButton');
         const shareOptions = document.getElementById('shareOptions');
         const shareWhatsApp = document.getElementById('shareWhatsApp');
+        // smartLinkButton eliminado — Spotify cambió condiciones para Developers
         const notification = document.getElementById('notification');
         const installPwaInvitation = document.getElementById('install-pwa-invitation');
         const closeInvitationBtn = document.getElementById('close-invitation');
@@ -46,6 +48,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const playbackInfo = document.getElementById('playbackInfo');
         const playerHeader = document.querySelector('.player-header');
         const filterToggleStar = document.getElementById('filterToggleStar');
+        
+        // isMobileOS / smartLinkBtn eliminados — SmartLink removido
 
         let stationsById = {};
         let currentStation = null;
@@ -73,6 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let songTransitionDetected = false;
         let isUpdatingSongInfo = false;
         let currentCredits = "";
+        // currentSpotifyUrl / currentSmartLink eliminados — SmartLink removido
         const RAPID_CHECK_THRESHOLD = 150;
         audioPlayer.volume = 0.5;
 
@@ -1255,6 +1260,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 if (d) {
+                    // currentSpotifyUrl / currentSmartLink eliminados — SmartLink removido
+
                     if (d.imageUrl) {
                         displayAlbumCoverFromUrl(d.imageUrl);
                     }
@@ -1268,10 +1275,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
+                // MusicBrainz ahora se llama desde el Worker, solo queda la lógica de créditos
                 getMusicBrainzCredits(sA, sT, d?.isrc || null, fetchId);
                 
             } catch (e) {
-                logErrorForAnalysis('Spotify/Worker error', {
+                logErrorForAnalysis('Last.fm error', {
                     error: e.message, 
                     artist: sA, 
                     title: sT, 
@@ -1281,7 +1289,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // ==========================================================================
-        // FUNCIÓN: getMusicBrainzCredits
+        // FUNCIÓN: getMusicBrainzCredits (solo créditos — ISRC/sello/track# van por Worker)
         // ==========================================================================
         async function getMusicBrainzCredits(artist, title, isrc, fetchId) {
             if (fetchId !== currentSongFetchId) {
@@ -1293,6 +1301,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 let recordingId = null;
 
+                // Si tenemos ISRC del Worker, buscar directo
                 if (isrc) {
                     try {
                         const isrcUrl = 'https://musicbrainz.org/ws/2/isrc/' + isrc + '?inc=artist-rels&fmt=json';
@@ -1308,6 +1317,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     } catch (isrcError) {}
                 }
 
+                // Fallback: búsqueda por artista y título
                 const cleanTitle = title.replace(/\([^)]*\)/g, '').trim();
                 const searchUrl = 'https://musicbrainz.org/ws/2/recording/?query=artist:"' + encodeURIComponent(artist) + '" AND recording:"' + encodeURIComponent(cleanTitle) + '"&fmt=json&limit=5';
                 const res = await fetch(searchUrl);
@@ -1489,6 +1499,8 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 trackGenre.textContent = '--';
             }
+            
+            // trackPosition eliminado — bloque removido
 
             if (trackIsrc) {
                 if (d.isrc && d.isrc.trim() !== '') {
@@ -1497,6 +1509,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     trackIsrc.textContent = '----';
                 }
             }
+
+            // smartLinkButton.classList.add('visible') eliminado — SmartLink removido
         }
 
         // =======================================================================
@@ -1540,6 +1554,7 @@ document.addEventListener('DOMContentLoaded', () => {
             trackStartTime = 0;
             if (countdownTimer) countdownTimer.textContent = '--:--';
             if (totalDuration) totalDuration.textContent = '(--:--)';
+            // trackPosition eliminado — línea removida
             if (countdownTimer) countdownTimer.classList.remove('ending');
             songTransitionDetected = false;
         }
@@ -1658,6 +1673,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             albumTotalDuration.textContent = '--:--';
             trackGenre.textContent = '--';
+            // trackPosition eliminado — línea removida
             const trackCredits = document.getElementById('trackCredits');
             if (trackCredits) {
                 trackCredits.textContent = '--';
@@ -1669,6 +1685,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     tooltipContent.textContent = '';
                 }
             }
+            // smartLinkButton.classList.remove('visible') eliminado — SmartLink removido
+            // currentSpotifyUrl = null / currentSmartLink = null eliminados — SmartLink removido
         }
 
         function startSongInfoUpdates() {
@@ -1711,6 +1729,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 showWelcomeScreen();
             });
         }
+
+        // Listener SmartLink (if smartLinkButton) eliminado — Spotify cambió condiciones para Developers
 
         if (audioPlayer) {
             audioPlayer.addEventListener('error', (e) => {
