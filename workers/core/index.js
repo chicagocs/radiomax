@@ -629,4 +629,5 @@ var index_default = {
     return handleScheduled(event, env, ctx);
   }
 };
+
 export { index_default as default };
