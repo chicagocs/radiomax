@@ -18,5 +18,5 @@ Características claves
 
 Tecnologías Utilizadas<br>
 Frontend: HTML5, CSS3, JavaScript (ES6+)<br>
-PWA: Service Workers, Web App Manifest<br>
+PWA: Service Workers, Web App Manifest.<br>
 Backend/Proxy: Cloudflare Workers para llamadas a APIs seguras.<br>
