@@ -16,6 +16,7 @@ Características claves
 🔒 Seguro y robusto: Implementa las mejores prácticas de seguridad web moderna, incluyendo Content Security Policy (CSP).<br>
 📱 Totalmente adaptable: Se adapta sin problemas a cualquier tamaño de pantalla, desde escritorio hasta móvil.<br>
 
+
 Tecnologías Utilizadas<br>
 Frontend: HTML5, CSS3, JavaScript (ES6+)<br>
 PWA: Service Workers, Web App Manifest.<br>
